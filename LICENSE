@@ -1,0 +1,31 @@
+granvl Plugin License
+
+Copyright (c) 2026 Granville Technologies Inc. All rights reserved.
+
+This plugin — its manifests, the granvl-app skill and its resources, and the
+bundled assets (the "Plugin") — is proprietary to Granville Technologies Inc.
+
+Permitted use. You may install and use the Plugin, unmodified, with an AI
+agent or assistant for the purpose of using the granvl service
+(https://granvl.com) under the granvl Terms of Service
+(https://app.granvl.com/terms).
+
+Directory listing. Anthropic, OpenAI and other agent platform operators that
+list the Plugin may reproduce, display and distribute the Plugin and its
+descriptions and documentation to their users for that purpose.
+
+Dashboard kit. The files under skills/granvl-app/resources/dashboard-kit/
+(granvl.css, charts.js, index.html) are template code meant to be copied
+into your own project: you may copy, modify and use them in your own work
+without restriction. No warranty applies to them either.
+
+Restrictions. Except as stated above, you may not copy, modify, translate,
+create derivative works of, redistribute, sublicense, sell or publicly
+display the Plugin or any part of it, and you may not use the skill
+content to build or train a competing product or service.
+
+No warranty. The Plugin is provided "as is", without warranty of any kind.
+Granville Technologies Inc. is not liable for any claim, damages or other
+liability arising from the Plugin or its use.
+
+Termination. This license ends automatically if you breach it.

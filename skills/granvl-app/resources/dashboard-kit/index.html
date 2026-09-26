@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paid Media Command Center</title>
+<link rel="stylesheet" href="./granvl.css">
+</head>
+<body class="gvk-page">
+<main class="wrap">
+
+  <!-- header -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap">
+    <div>
+      <span class="label">Cross-channel operating view</span>
+      <h1 class="h1">Fix the signal.<br>Then scale what works.</h1>
+      <p class="sub">Google, Microsoft, Meta and every connected landing page in one decision queue. Snapshot only; all live changes stay approval-gated.</p>
+    </div>
+    <span class="stamp"><span class="healthdot"></span>granvl snapshot · REPLACE_WITH_TIMESTAMP</span>
+  </div>
+
+  <!-- KPI stat row -->
+  <section class="section grid cols-4">
+    <div class="card statcard">
+      <div class="head"><span class="label">7-day spend</span><span class="delta up">+4.2%</span></div>
+      <div class="value">$3,290</div>
+      <div class="meta">Raw mixed-currency total</div>
+    </div>
+    <div class="card statcard">
+      <div class="head"><span class="label">Joined spend</span><span class="delta up">+2.1%</span></div>
+      <div class="value">17.9%</div>
+      <div class="meta">$589 linked to first-party outcomes</div>
+    </div>
+    <div class="card statcard">
+      <div class="head"><span class="label">Dead destinations</span><span class="delta down">+3</span></div>
+      <div class="value">3</div>
+      <div class="meta">Live Google ads resolving to a 404</div>
+    </div>
+    <div class="card statcard">
+      <div class="head"><span class="label">Qualified outcomes</span></div>
+      <div class="value">5</div>
+      <div class="meta">All attributed to one Meta campaign</div>
+    </div>
+  </section>
+
+  <!-- chart + coverage: section labels sit ABOVE the cards, like the app -->
+  <section class="section grid cols-2">
+    <div>
+      <span class="label small">Traffic and outcomes</span>
+      <div class="card" style="margin-top:10px">
+        <div class="cardhead"><h2 class="h2">Seven-day conversion rhythm</h2></div>
+        <div class="chartbox"><div id="rhythm"></div></div>
+        <p class="note" style="padding:0 20px 16px">580 visitors and 52 conversions in the window. Qualification rules are not yet set everywhere, so conversion volume is not a complete business signal.</p>
+      </div>
+    </div>
+    <div>
+      <span class="label small">Measurement integrity</span>
+      <div class="card" style="margin-top:10px">
+        <div class="cardhead"><h2 class="h2">Entity tracking coverage</h2></div>
+        <div class="rows">
+          <div class="row"><span class="name" style="font-weight:400;color:var(--text-body)"><span class="healthdot"></span>&nbsp; Healthy</span><span class="num ok">125</span></div>
+          <div class="row"><span class="name" style="font-weight:400;color:var(--text-body)"><span class="healthdot warn"></span>&nbsp; Missing UTMs</span><span class="num warn">205</span></div>
+          <div class="row"><span class="name" style="font-weight:400;color:var(--text-body)"><span class="healthdot warn"></span>&nbsp; Missing ad ID</span><span class="num warn">4</span></div>
+          <div class="row"><span class="name" style="font-weight:400;color:var(--text-body)"><span class="healthdot bad"></span>&nbsp; Dead destination</span><span class="num bad">3</span></div>
+          <div class="row"><span class="name" style="font-weight:400;color:var(--text-body)"><span class="healthdot bad"></span>&nbsp; Nonconforming UTM</span><span class="num bad">1</span></div>
+        </div>
+        <div class="chips" style="padding:4px 20px 16px">
+          <span class="chip"><span class="healthdot"></span>Workflow <span class="count">complete</span></span>
+          <span class="chip"><span class="healthdot bad"></span>Account <span class="count">action required</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- decision queue -->
+  <section class="section">
+    <span class="label small">Decision queue</span>
+    <div class="card" style="margin-top:10px">
+      <div class="cardhead"><h2 class="h2">What your agent should do next</h2></div>
+      <ul class="checklist">
+        <li><span class="pri p0">P0</span><span>Repair three live Google destinations<span class="why">Ads are spending into a 404. Fix the final URLs or pause the ads.</span></span></li>
+        <li><span class="pri p1">P1</span><span>Add UTMs to 205 untagged entities<span class="why">Untagged traffic cannot be joined to first-party outcomes.</span></span></li>
+        <li><span class="pri p2">P2</span><span>Set a qualification rule on the two newest funnels<span class="why">Raw conversions overstate lead quality without one.</span></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <p class="note section">Built with the granvl dashboard kit. Ask your agent to refresh this snapshot any time.</p>
+</main>
+
+<script src="./charts.js"></script>
+<script>
+  function renderCharts() {
+    gvkBars(document.getElementById('rhythm'), {
+      series: [
+        { label: 'Wed', v: 41, c: 4 }, { label: 'Thu', v: 63, c: 3 },
+        { label: 'Fri', v: 98, c: 9 }, { label: 'Sat', v: 68, c: 7 },
+        { label: 'Sun', v: 98, c: 11 }, { label: 'Mon', v: 105, c: 7 },
+        { label: 'Tue', v: 107, c: 11 }
+      ],
+      keys: ['v', 'c'],
+      colors: ['var(--blue)', 'var(--green)']
+    });
+  }
+  renderCharts();
+  window.addEventListener('resize', renderCharts);
+</script>
+</body>
+</html>

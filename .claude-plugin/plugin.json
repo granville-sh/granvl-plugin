@@ -1,0 +1,24 @@
+{
+  "name": "granvl",
+  "version": "1.0.0-2665889f7901",
+  "description": "Build, deploy, A/B test and optimize landing pages and paid campaigns on granvl — hosting, first-party analytics and privacy-first lead delivery, driven from your AI agent.",
+  "author": {
+    "name": "Granville Technologies Inc.",
+    "email": "support@granvl.com",
+    "url": "https://granvl.com"
+  },
+  "homepage": "https://granvl.com",
+  "repository": "https://github.com/granville-sh/granvl-plugin",
+  "license": "LicenseRef-granvl-Proprietary",
+  "keywords": [
+    "landing-pages",
+    "ab-testing",
+    "analytics",
+    "google-ads",
+    "meta-ads",
+    "lead-generation",
+    "marketing"
+  ],
+  "displayName": "granvl",
+  "mcpServers": "./.mcp.json"
+}

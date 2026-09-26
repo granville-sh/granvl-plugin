@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "granvl": {
+      "type": "http",
+      "url": "https://app.granvl.com/api/mcp"
+    }
+  }
+}

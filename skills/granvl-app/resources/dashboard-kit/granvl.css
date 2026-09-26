@@ -1,0 +1,240 @@
+/* granvl dashboard kit — measured off the LIVE app dashboard.
+ *
+ * Every value below was read from computed styles on app.granvl.com's
+ * dashboard (the lumen/marketplace system): #151515 page, #1c1d1e cards
+ * with 12px radius and hairline white borders, sans-serif uppercase
+ * section labels OUTSIDE the cards, normal-weight body, muted numbers.
+ *
+ * Copy freely and edit. This file belongs to your project once copied.
+ */
+
+:root {
+  /* surfaces (measured) */
+  --bg: #151515;
+  --panel: #141516;
+  --card: #1c1d1e;
+  --card-soft: #232323;
+  --hairline: rgba(255, 255, 255, 0.06);
+
+  /* text (measured) */
+  --text: #f4f4f4;
+  --text-soft: #d1d1d1;
+  --text-subtle: #a6a6a6;
+  --text-body: #d4d4d4;
+
+  /* accents (app palette) */
+  --blue: #4f8ef7;
+  --teal: #3fbfb2;
+  --green: #62d08a;
+  --amber: #f0b84a;
+  --red: #e0705f;
+
+  /* shape (measured: 12px everywhere) */
+  --radius: 12px;
+
+  /* type — the app uses Geist Sans; closest local equivalent */
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body.gvk-page {
+  background: var(--bg);
+  color: var(--text-body);
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── layout ─────────────────────────────────────────────────────────── */
+.wrap { max-width: 1240px; margin: 0 auto; padding: 40px 32px 80px; }
+.grid { display: grid; gap: 14px; }
+.grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .grid.cols-3, .grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; }
+}
+.section { margin-top: 36px; }
+
+/* ── type (measured) ────────────────────────────────────────────────── */
+/* section label — sits ABOVE a card, like CAMPAIGNS / FUNNELS on home */
+.label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.023em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.label.small { font-size: 11px; }
+h1.h1 {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--text);
+  margin: 8px 0 10px;
+}
+h2.h2 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin: 0;
+}
+.sub { font-size: 15px; color: var(--text-subtle); max-width: 640px; margin: 0; }
+.note { font-size: 12.5px; color: var(--text-subtle); line-height: 1.5; }
+
+/* ── card (measured: #1c1d1e, 12px, hairline border) ────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+.card.pad { padding: 18px 20px; }
+/* section header INSIDE a flush card (chart titles etc.) */
+.card .cardhead { padding: 16px 20px 12px; }
+
+/* ── stat card ──────────────────────────────────────────────────────── */
+.statcard { padding: 16px 20px 18px; }
+.statcard .head { display: flex; align-items: center; justify-content: space-between; }
+.statcard .label { font-size: 11px; }
+.statcard .delta { font-size: 12.5px; font-weight: 500; letter-spacing: 0.01em; }
+.statcard .delta.up { color: var(--green); }
+.statcard .delta.down { color: var(--red); }
+.statcard .value {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.statcard .meta { margin-top: 6px; font-size: 12.5px; color: var(--text-subtle); }
+
+/* ── list rows (the home CAMPAIGNS/FUNNELS card pattern) ────────────── */
+/* rows are flush with the card edge; hairline dividers; muted numbers */
+.rows { display: flex; flex-direction: column; }
+.row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--hairline);
+  font-size: 13.5px;
+  color: var(--text-body);
+}
+.row:first-child { border-top: none; }
+.row .name { font-weight: 500; color: var(--text); min-width: 0; }
+.row .name .sublabel { display: block; font-size: 12px; font-weight: 400; color: var(--text-subtle); }
+.row .num {
+  font-size: 13.5px; font-weight: 500; letter-spacing: 0.01em;
+  color: var(--text-subtle); font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.row .num.strong { color: var(--text); }
+.row .num.ok { color: var(--green); }
+.row .num.warn { color: var(--amber); }
+.row .num.bad { color: var(--red); }
+/* footer action row, like "Create new campaign →" */
+.row.action {
+  background: var(--card);
+  color: var(--text-subtle);
+  justify-content: center;
+  font-size: 13.5px;
+  cursor: default;
+}
+
+/* ── table (column heads like VISITORS / CONVERSIONS / CONV %) ──────── */
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.023em;
+  text-transform: uppercase; color: var(--text-soft);
+  text-align: left; padding: 12px 20px 10px;
+}
+.table td {
+  font-size: 13.5px; padding: 12px 20px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+.table td .sublabel { display: block; font-size: 12px; color: var(--text-subtle); }
+.table td.num, .table th.num { text-align: right; }
+.table td.num { color: var(--text-subtle); font-weight: 500; }
+
+/* ── health dot + chips ─────────────────────────────────────────────── */
+.healthdot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green); vertical-align: middle;
+}
+.healthdot.warn { background: var(--amber); }
+.healthdot.bad { background: var(--red); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--card-soft);
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+  padding: 6px 13px;
+  font-size: 12.5px; font-weight: 500;
+  color: var(--text-soft);
+}
+.chip .count { color: var(--text-subtle); font-weight: 400; }
+
+/* ── buttons ────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--card-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit; font-size: 13.5px; font-weight: 500;
+  padding: 9px 16px; cursor: pointer;
+}
+.btn.primary { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+/* ── checklist / decision queue ─────────────────────────────────────── */
+.checklist { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.checklist li {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 20px;
+  border-top: 1px solid var(--hairline);
+  font-size: 13.5px;
+  color: var(--text);
+}
+.checklist li:first-child { border-top: none; }
+.pri {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em;
+  border-radius: 6px; padding: 3px 7px; flex-shrink: 0; margin-top: 2px;
+}
+.pri.p0 { background: rgba(224, 112, 95, 0.14); color: var(--red); }
+.pri.p1 { background: rgba(240, 184, 74, 0.14); color: var(--amber); }
+.pri.p2 { background: rgba(79, 142, 247, 0.14); color: var(--blue); }
+.checklist .why { display: block; color: var(--text-subtle); font-weight: 400; font-size: 12.5px; margin-top: 3px; }
+
+/* ── callout ────────────────────────────────────────────────────────── */
+.callout {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--accent, var(--blue));
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 13.5px;
+  color: var(--text-subtle);
+}
+.callout b { color: var(--text); font-weight: 600; }
+
+/* ── freshness stamp — ALWAYS include one ───────────────────────────── */
+.stamp {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 500; letter-spacing: 0.01em;
+  color: var(--text-subtle);
+}
+
+/* ── charts (SVG output from charts.js) ─────────────────────────────── */
+.chart-label { font-family: var(--font); font-size: 10px; fill: var(--text-subtle); }
+.chartbox { padding: 4px 20px 12px; }

@@ -235,7 +235,7 @@ Clones the template into the workspace as an unpublished funnel (quota-checked).
 
 #### `upload_lead_magnet` `{ source_url? | html? | data?, domain?, funnel_id?, filename?, name?, slug? }`
 
-Add a **PDF or HTML** lead magnet to the workspace's Lead magnets library (the same one as the dashboard's Resources → Lead magnets page). granvl hosts it on a workspace domain and serves it at `https://{domain}/{slug}` (also `/d/{slug}`), ungated, with served downloads counted. Provide the file exactly one way: `source_url` (public URL, fetched server-side, max 20 MB), `html` (the full HTML document as a string — for an HTML ebook on disk or one you just wrote), or `data` (base64 PDF/HTML bytes, max 4 MB). Domain: `domain` (hostname or id), or `funnel_id` to use that funnel's domain; a one-domain workspace needs neither. Returns `url` + `type` (`pdf`/`html`). The slug must not collide with a funnel page slug on that domain.
+Add a **PDF or HTML** lead magnet to the workspace's Lead magnets library (the same one as the dashboard's Resources → Lead magnets page). granvl hosts it on a workspace domain at the path `/{slug}` (also `/d/{slug}`), ungated, and counts each time it is served. Provide the file exactly one way: `source_url` (a public URL the granvl server retrieves, max 20 MB), `html` (the full HTML document as a string — for an HTML ebook on disk or one you just wrote), or `data` (base64 PDF/HTML bytes, max 4 MB). Domain: `domain` (hostname or id), or `funnel_id` to use that funnel's domain; a one-domain workspace needs neither. Returns `url` + `type` (`pdf`/`html`). The slug must not collide with a funnel page slug on that domain.
 
 #### `list_lead_magnets` `{ domain?, funnel_id? }`
 
@@ -751,7 +751,7 @@ Operators: `equals`, `not_equals`, `contains`, `gte`, `lte`, `gt`, `lt`, `is_tru
 Every form submission carries `granville_lead_id` (plus `granville_variant_id` / `granville_funnel_id`). The user wires their CRM (or any deal-close automation) to POST back with `lead_id` (or the older `session_id`):
 
 ```
-POST https://app.granvl.com/api/qualify/{userToken}
+POST <the webhook URL from get_qualify_webhook_url>
 Content-Type: application/json
 
 {
@@ -762,7 +762,7 @@ Content-Type: application/json
 }
 ```
 
-`get_qualify_webhook_url()` returns the live URL + setup instructions. Token is rotateable from the dashboard.
+`get_qualify_webhook_url()` returns the live URL (it carries a per-workspace token, rotateable from the dashboard) plus setup instructions. Never construct this URL by hand.
 
 ### Stats integration
 
@@ -1160,8 +1160,8 @@ When MCP tools fail, surface the error verbatim — the user often needs the lit
 | `Invalid ts format — expected ISO 8601`                                              | `get_variant_html_at_time` got bad timestamp                                                                                                                                                                               | Use ISO format e.g. `2026-05-04T11:55:00Z`                             |
 | `Invalid token` (qualify webhook)                                                    | Wrong `userToken` in the URL                                                                                                                                                                                               | Call `get_qualify_webhook_url` for the current URL                     |
 | `Internal server error`                                                              | Caught at the top-level handler                                                                                                                                                                                            | Retry once; if persistent, ask user to check `/dashboard/mcp`          |
-| Codex: `MCP startup failed: OAuth refresh credentials … missing an authorization server issuer; authorization required` / "granvl tools are unavailable" | Codex (2026-08+) refuses stored logins that predate its issuer binding. Tell the user: run `codex mcp login granvl` (or sign in again under the app's MCP settings), then start a new thread. Not a granvl outage. |
-| Codex: `MCP client for granvl timed out after 30 seconds`                              | Startup budget too tight for a cold start + the tool list. Add `startup_timeout_sec = 60` under `[mcp_servers.granvl]` in `~/.codex/config.toml`. |
+| `authorization required` / "granvl tools are unavailable" at client startup | The client's stored sign-in for granvl is stale or predates the current auth setup. Not a granvl outage. | Tell the user to sign in to granvl again from their client's MCP / connector settings, then start a new thread. |
+| Client reports the granvl server timed out at startup | A cold start plus the full tool list can exceed a tight client startup budget. | Retry; if the client exposes a startup-timeout setting, the user can raise it there. |
 
 ---
 

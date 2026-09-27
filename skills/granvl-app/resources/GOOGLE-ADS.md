@@ -7,7 +7,7 @@ granvl's opinionated playbooks and build flows for Google Search and Google Dema
 **Invariants (both flows, server-enforced — same posture as the Meta build):**
 
 - **Always created PAUSED.** The campaign is the **single spend gate** — ONE switch to activate in Google Ads (unlike Meta's three paused levels). There is deliberately no activate tool; activation is always the human's action. Close every build by telling the user this.
-- **Budget guardrail:** `daily_budget_usd` (and any bid) is capped at min(workspace admin's cap, granvl's **$200/day** platform ceiling) BEFORE any write — an over-cap request returns the cap in the error; relay it, NEVER work around it.
+- **Budget guardrail:** `daily_budget_usd` (and any bid) is capped at the lower of the workspace admin's cap and granvl's **200 USD per day** platform ceiling BEFORE any write — an over-cap request returns the cap in the error; relay it, NEVER work around it.
 - **Plain URLs, never pre-tagged:** granvl's Google UTM template (**ValueTrack** ids) is applied as the **Final URL suffix** — campaign-wide AND on each ad's own Ad URL options — so spend joins first-party conversions automatically — every `final_url` you pass stays PLAIN.
 
 ---

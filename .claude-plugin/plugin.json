@@ -1,6 +1,6 @@
 {
   "name": "granvl",
-  "version": "1.0.0-2665889f7901",
+  "version": "1.0.0-34e578849c8d",
   "description": "Build, deploy, A/B test and optimize landing pages and paid campaigns on granvl — hosting, first-party analytics and privacy-first lead delivery, driven from your AI agent.",
   "author": {
     "name": "Granville Technologies Inc.",
@@ -20,5 +20,7 @@
     "marketing"
   ],
   "displayName": "granvl",
+  "privacyPolicyUrl": "https://granvl.com/privacy",
+  "termsOfServiceUrl": "https://granvl.com/terms",
   "mcpServers": "./.mcp.json"
 }

@@ -209,7 +209,7 @@ several client workspaces                  switch_workspace        (by id or nam
 "Take it out of the folder"                # folder; remove: true takes items out. list_folders({ kind })
                                            # shows what exists. Also for product / icp / angle /
                                            # copy_line / creative. Folders never affect serving or stats.
-                                           # Folders are PER BRAND: pass the brand the items live in (default
+                                           # Folders are PER BRAND: provide the brand the items live in (default
                                            # brand when omitted); items from another brand are skipped, and a
                                            # funnel that changes brand leaves its old brand's folder.
 
@@ -473,7 +473,7 @@ The server REFUSES `create_variant` / `update_variant` / `patch_variant_html` / 
 
 These conventions are enforced by the serve pipeline. Violating them won't reject the variant on write, but the page will mis-track at runtime.
 
-**Scaffold first, always.** Before authoring any NEW variant HTML, call `get_page_scaffold(page_type)` and build on what it returns — a contract-perfect skeleton (control-field placement, form shape, `data-step` sections, `<main>` landmark) guaranteed to pass the write-time audit and the publish validator with zero warnings. Replace the `REPLACE:` markers with real content; keep the structure exactly as given. Freehand HTML is how contract violations happen; the scaffold is how pages come out correct on the first pass regardless of which model is driving.
+**Scaffold first, always.** Before authoring any NEW variant HTML, call `get_page_scaffold(page_type)` and build on what it returns — a contract-perfect skeleton (control-field placement, form shape, `data-step` sections, `<main>` landmark) guaranteed to provide the write-time audit and the publish validator with zero warnings. Replace the `REPLACE:` markers with real content; keep the structure exactly as given. Freehand HTML is how contract violations happen; the scaffold is how pages come out correct on the first pass regardless of which model is driving.
 
 **Before generating or editing ANY variant HTML, STOP and read [resources/PAGE-BUILDING.md](./resources/PAGE-BUILDING.md)** — it has the full form-wiring guide, quiz scaffold, embed tables, styling paths, brand-kit application, a11y and performance detail, and the publish-validator code playbook. Do not author page HTML from memory. The hard rules it expands on:
 
@@ -545,7 +545,7 @@ For a small change to an existing variant, **DO NOT regenerate the entire HTML f
 2. Make the targeted change
 3. `update_variant(variant_id, html_content, change_summary, generation_prompt?)`
 
-**ALWAYS pass `change_summary`** — a tight one-liner of what you changed and why. It becomes the label on the edit markers in `get_variant_history`; an unlabeled marker forces the reader to guess. Pass `generation_prompt` when the change came from a specific user instruction.
+**ALWAYS provide `change_summary`** — a tight one-liner of what you changed and why. It becomes the label on the edit markers in `get_variant_history`; an unlabeled marker forces the reader to guess. Provide `generation_prompt` when the change came from a specific user instruction.
 
 **Edit vs. new variant — default to EDIT.** _"Change / edit / fix / tweak / update X"_ → `update_variant` on that same variant, and keep using the _same_ variant id across iteration rounds (five tweaks = five updates to one id, not five new variants). Call `create_variant` / `bulk_create_variants` **only** when the user explicitly wants a new variant alongside (_"new variant"_, _"A/B test this against..."_). Zero-traffic funnels: edit in place, always — new-variant clutter has no upside there.
 
@@ -591,7 +591,7 @@ Every `create_variant` **and** `bulk_create_variants` call **requires** five att
 | `target_audience`   | One sentence on who this variant is built for                                                       | ≤ 500 chars  |
 | `form_factor`       | Short structural description (long-form, quiz-first, VSL, etc.)                                     | ≤ 200 chars  |
 
-`bulk_create_variants` takes the same five fields **per item** in the `variants` array. `update_variant` accepts them optionally — pass updated values whenever an edit shifts the headline / angle / value-prop / form (a weight change alone doesn't need them). There is no `status` field on `update_variant`: pause = `weight: 0`, activate = `publish_funnel`. A worked example + the optional bucket-field vocabularies are in [resources/PAGE-BUILDING.md](./resources/PAGE-BUILDING.md) §9.
+`bulk_create_variants` takes the same five fields **per item** in the `variants` array. `update_variant` accepts them optionally — provide updated values whenever an edit shifts the headline / angle / value-prop / form (a weight change alone doesn't need them). There is no `status` field on `update_variant`: pause = `weight: 0`, activate = `publish_funnel`. A worked example + the optional bucket-field vocabularies are in [resources/PAGE-BUILDING.md](./resources/PAGE-BUILDING.md) §9.
 
 ---
 

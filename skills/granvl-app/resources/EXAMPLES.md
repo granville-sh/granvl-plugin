@@ -1010,7 +1010,7 @@ This works until the user moves the funnel to a different domain. Use `{{THANK_Y
 delete_variant({ variant_id: "...", confirm: true })
 ```
 
-Always require `"yes, delete it"` from the user before passing `confirm: true`. There's no undo and analytics events are gone.
+Always require `"yes, delete it"` from the user before providing `confirm: true`. There's no undo and analytics events are gone.
 
 ### ❌ `set_weights` without first reading current variants
 

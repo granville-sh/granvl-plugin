@@ -53,11 +53,11 @@ Pages come back empty (no variants yet) — call `create_variant` next.
 
 #### `update_funnel` `{ funnel_id, name?, platform?, domain_id?, thank_you_view_conversion?, validate_phone_enabled?, validate_email_enabled?, trusted_form_enabled?, goal? }`
 
-Pass `domain_id: null` to disconnect. No `status` arg — `publish_funnel` / `unpublish_funnel` own status. The other args: `thank_you_view_conversion` (count TY-page arrival as a conversion — for third-party iframe-embed forms that redirect to the TY page, see PAGE-BUILDING §2d), `validate_phone_enabled` / `validate_email_enabled` (silent real-number / real-mailbox checks at submit, inline error, no texted code), `trusted_form_enabled` (TrustedForm snippet + `xxTrustedFormCertUrl` field on every lead for TCPA consent proof), `goal` ∈ `LEAD | SALE | BOOKING | null` (the funnel's outcome goal — drives which KPIs dashboards lead with). Qualification rules go through `set_qualification_rule`, not here; the integration phone format (E.164 / 10-digit / etc.) is set in the dashboard funnel **Integrations** tab, not via MCP.
+Provide `domain_id: null` to disconnect. No `status` arg — `publish_funnel` / `unpublish_funnel` own status. The other args: `thank_you_view_conversion` (count TY-page arrival as a conversion — for third-party iframe-embed forms that redirect to the TY page, see PAGE-BUILDING §2d), `validate_phone_enabled` / `validate_email_enabled` (silent real-number / real-mailbox checks at submit, inline error, no texted code), `trusted_form_enabled` (TrustedForm snippet + `xxTrustedFormCertUrl` field on every lead for TCPA consent proof), `goal` ∈ `LEAD | SALE | BOOKING | null` (the funnel's outcome goal — drives which KPIs dashboards lead with). Qualification rules go through `set_qualification_rule`, not here; the integration phone format (E.164 / 10-digit / etc.) is set in the dashboard funnel **Integrations** tab, not via MCP.
 
 #### `delete_funnel` `{ funnel_id, confirm: true }`
 
-Cascades pages, variants, events, journeys, qualifications. **Confirm with the user before passing `confirm: true`.**
+Cascades pages, variants, events, journeys, qualifications. **Confirm with the user before providing `confirm: true`.**
 
 #### `publish_funnel` `{ funnel_id }`
 
@@ -105,7 +105,7 @@ Cascades variants + events for that page.
 
 #### `create_variant` `{ page_id, name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, generation_prompt?, generation_model?, generation_context? }`
 
-The five attribution fields (`headline` verbatim H1, `angle_hypothesis`, `value_proposition`, `target_audience`, `form_factor`) are **required** — the call rejects without them (see SKILL.md "Variant metadata"). Status defaults to `DRAFT`. `weight` defaults to 50; sums across active variants must reach 100. `embedded_widget` ∈ `calendly | cal_com | hubspot_meetings | acuity | savvycal | tidycal | custom | null` — set it whenever the variant embeds a booking widget (with `custom`, also pass `embedded_widget_config: { originPattern, matcherJs }`); see PAGE-BUILDING §2c. `generation_*` fields are stored on the initial `VariantVersion` row (provenance shown in the version timeline — pass them when you can).
+The five attribution fields (`headline` verbatim H1, `angle_hypothesis`, `value_proposition`, `target_audience`, `form_factor`) are **required** — the call rejects without them (see SKILL.md "Variant metadata"). Status defaults to `DRAFT`. `weight` defaults to 50; sums across active variants must reach 100. `embedded_widget` ∈ `calendly | cal_com | hubspot_meetings | acuity | savvycal | tidycal | custom | null` — set it whenever the variant embeds a booking widget (with `custom`, also provide `embedded_widget_config: { originPattern, matcherJs }`); see PAGE-BUILDING §2c. `generation_*` fields are stored on the initial `VariantVersion` row (provenance shown in the version timeline — pass them when you can).
 
 #### `bulk_create_variants` `{ page_id, variants: [{ name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, embedded_widget?, ... }] }`
 
@@ -113,7 +113,7 @@ Same shape as `create_variant`, batched — including the five required attribut
 
 #### `update_variant` `{ variant_id, name?, html_content?, weight?, headline?, angle_hypothesis?, value_proposition?, target_audience?, form_factor?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, generation_prompt?, generation_model?, generation_context?, change_summary?, acknowledge_stat_pollution? }`
 
-**When `html_content` differs from the current value**, a new `VariantVersion` row is written automatically with `source: AI_EDITED`. Pass `change_summary` (one-liner like "Tightened headline; swapped CTA color") so the version timeline tells the iteration story, and re-articulate the attribution fields whenever the edit shifts headline / angle / value-prop / form. `acknowledge_stat_pollution: true` is the guardrail escape hatch — only after the USER explicitly consents (see SKILL.md).
+**When `html_content` differs from the current value**, a new `VariantVersion` row is written automatically with `source: AI_EDITED`. Provide `change_summary` (one-liner like "Tightened headline; swapped CTA color") so the version timeline tells the iteration story, and re-articulate the attribution fields whenever the edit shifts headline / angle / value-prop / form. `acknowledge_stat_pollution: true` is the guardrail escape hatch — only after the USER explicitly consents (see SKILL.md).
 
 #### `get_variant` `{ variant_id }`
 
@@ -143,7 +143,7 @@ Clone an entire funnel — all pages + variants — as a DRAFT copy owned by the
 
 #### `list_variant_versions` `{ variant_id, include_html?, limit? }`
 
-Every saved version with provenance. Each row carries `source` (AI_GENERATED / AI_EDITED / HUMAN_EDITED / IMPORTED / BACKFILL), `generation_prompt`, `generation_model`, `change_summary`, `created_at`. HTML omitted by default — pass `include_html: true` to fetch it (use for diff-style comparisons).
+Every saved version with provenance. Each row carries `source` (AI_GENERATED / AI_EDITED / HUMAN_EDITED / IMPORTED / BACKFILL), `generation_prompt`, `generation_model`, `change_summary`, `created_at`. HTML omitted by default — provide `include_html: true` to fetch it (use for diff-style comparisons).
 
 #### `get_variant_html_at_time` `{ variant_id, timestamp }`
 
@@ -185,7 +185,7 @@ Verification progress. Don't poll faster than once per ~30 seconds. While `sslSt
 
 #### `verify_domain` `{ domain_id }`
 
-Runs our checks (TXT-ownership at `_granville-verify.<domain>` AND routing CNAME/A) and then asks the edge whether it has accepted the domain. Returns `{ verified, status, message }` plus DNS instructions when checks fail. If our checks pass but the edge still needs its own record, `verified` is `false` and `extraRecords` holds the exact record to add — relay it verbatim and call again after it resolves. Safe to call repeatedly while waiting for propagation.
+Runs our checks (TXT-ownership at `_granville-verify.<domain>` AND routing CNAME/A) and then asks the edge whether it has accepted the domain. Returns `{ verified, status, message }` plus DNS instructions when checks fail. If our checks succeed but the edge still needs its own record, `verified` is `false` and `extraRecords` holds the exact record to add — relay it verbatim and call again after it resolves. Safe to call repeatedly while waiting for propagation.
 
 #### `get_domain_dns_records` `{ domain_id }`
 
@@ -193,7 +193,7 @@ Returns the exact records to publish (TXT ownership + CNAME/A routing). Pair wit
 
 #### `update_domain_tracking` `{ domain_id, meta_pixel_id?, ga4_measurement_id?, google_ads_conversion_id?, google_ads_conversion_label?, google_tag_id?, google_ads_tracking_mode?, attribution_consent_mode?, tiktok_pixel_id?, google_tag_manager_id?, microsoft_ads_uet_tag_id?, sms_sender_name? }`
 
-Per-domain ad-platform tracking IDs. Server-side (CAPI / Events API) AND client-side (pixel) are configured together. Pass `null` to clear any field. **Secrets are dashboard-only:** the Meta CAPI access token, GA4 API secret and TikTok Events API token are entered by the user in granvl → Settings → Tracking; the tool rejects them as arguments, and its `configured` summary reports whether each is set.
+Per-domain ad-platform tracking IDs. Server-side (CAPI / Events API) AND client-side (pixel) are configured together. Provide `null` to clear any field. **Secrets are dashboard-only:** the Meta CAPI access token, GA4 API secret and TikTok Events API token are entered by the user in granvl → Settings → Tracking; the tool rejects them as arguments, and its `configured` summary reports whether each is set.
 
 `google_ads_tracking_mode`: `ga4_import` (GA4 server event imported into Ads) · `gtag_legacy` (granvl fires the AW- conversion tag from the page) · `gtm` (the user's own Tag Manager container fires Google Ads — set `google_tag_manager_id`; granvl loads the container and pushes a `pages_conversion` dataLayer event with `transaction_id`, `value`, `currency` and consent-gated pre-hashed `user_data`, and does NOT load or fire the AW- tag itself). In `gtm` mode the user must build, in GTM: a **Google tag** for their AW- id (Initialization – All Pages, with "Allow user-provided data capabilities" on), a Google Ads Conversion Tracking tag on a Custom Event trigger `pages_conversion` (Value → `value`, Currency → `currency`, Transaction ID → `transaction_id`, and a User-Provided Data variable of type Code returning the `user_data` object, whose keys are already in Google's `sha256_*` format), plus a Conversion Linker on All Pages; and in Google Ads set Enhanced conversions' method to "Google Tag Manager". Leads a funnel withholds from ad platforms arrive as `pages_conversion_unqualified`. Never switch a domain to `gtm` until the user confirms the container's Ads tag is published — otherwise Google Ads conversions stop entirely. `google_tag_id` (GT-) is only needed when the GA4 measurement ID isn't standalone-loadable; `google_ads_tracking_mode` ∈ `ga4_import` (recommended, default behavior) `| gtag_legacy`. `microsoft_ads_uet_tag_id` is a single credential — it drives both the client-side UET pixel and the server-side fire (no separate token). `sms_sender_name` is the brand in SMS verification texts ("Your {name} verification code is: 123456") — letters/numbers/spaces, ≤30 chars, nothing bank/gov/urgent-sounding; `null` returns to the default derived from the hostname (`get_domain` → `sms_sender_name.effective`).
 
@@ -207,7 +207,7 @@ Read the domain's brand kit (colors, fonts, radius, logo, voice, tagline, `brand
 
 #### `update_brand_kit` `{ domain_id, tokens?, name?, logo_url?, voice?, tagline?, brand_mode? }`
 
-Write the brand kit — pass only the fields you're changing (`tokens` = `{ colors, fonts, radius }`; upload the logo via `upload_image` first). `brand_mode: true` hard-locks brand styling; only toggle on explicit user request.
+Write the brand kit — include only the fields you're changing (`tokens` = `{ colors, fonts, radius }`; upload the logo via `upload_image` first). `brand_mode: true` hard-locks brand styling; only toggle on explicit user request.
 
 #### `test_tracking_pixel` `{ domain_id }`
 
@@ -275,7 +275,7 @@ OWNER/ADMIN only. Sets ADMIN or MEMBER; the owner's role and your own can't be c
 
 #### `set_form_destination` `{ funnel_id, input, replace_all? }`
 
-Paste a vendor URL or embed; the extractor parses + saves. **Non-destructive:** updates the funnel's existing destination of the SAME provider in place, or adds a new one alongside the rest (the funnel fans out to all of them) — destinations of other providers are never touched unless you pass `replace_all: true` (call `get_form_destinations` first and confirm with the user before removing anything you didn't add). Pass empty string to disconnect all. **LeadProsper:** paste the "Get API Specs" curl/JSON sample (carries `lp_campaign_id` + `lp_supplier_id` + `lp_key`); if only the key parses, the response returns `meta.requiresSetup: true` + `meta.missing[]` and asks for the full sample. LeadProsper field names are case-sensitive and `FirstName` + `LastName` are required. A pasted LeadProsper destination has no field map (inputs post under their own names) — for a real map use `set_leadprosper_destination` below.
+Paste a vendor URL or embed; the extractor parses + saves. **Non-destructive:** updates the funnel's existing destination of the SAME provider in place, or adds a new one alongside the rest (the funnel fans out to all of them) — destinations of other providers are never touched unless you provide `replace_all: true` (call `get_form_destinations` first and confirm with the user before removing anything you didn't add). Provide empty string to disconnect all. **LeadProsper:** paste the "Get API Specs" curl/JSON sample (carries `lp_campaign_id` + `lp_supplier_id` + `lp_key`); if only the key parses, the response returns `meta.requiresSetup: true` + `meta.missing[]` and asks for the full sample. LeadProsper field names are case-sensitive and `FirstName` + `LastName` are required. A pasted LeadProsper destination has no field map (inputs post under their own names) — for a real map use `set_leadprosper_destination` below.
 
 #### `list_leadprosper_campaigns` `{ campaign_id? }`
 
@@ -287,7 +287,7 @@ Full LeadProsper control — the dashboard mapper over MCP. `field_mappings` is 
 
 #### `update_form_destination` `{ funnel_id, destination_id, enabled?, label?, sort_order?, hidden_fields?, field_map? }`
 
-`field_map` (ActiveCampaign destinations only) replaces the field mapping — `{ "<form input name>": "<AC field name>" }`; AC's field names + `required` flags are in `get_form_destinations` → `meta.acFields`, the current map in `meta.fieldMap`. Copy a mapping between funnels by passing the source's `meta.fieldMap` unchanged. The response warns when a required AC field is left unmapped. `{}` clears the map.
+`field_map` (ActiveCampaign destinations only) replaces the field mapping — `{ "<form input name>": "<AC field name>" }`; AC's field names + `required` flags are in `get_form_destinations` → `meta.acFields`, the current map in `meta.fieldMap`. Copy a mapping between funnels by reusing the source's `meta.fieldMap` unchanged. The response warns when a required AC field is left unmapped. `{}` clears the map.
 
 Edit a saved destination without re-pasting: `enabled: false` pauses delivery but keeps the config (prefer this over deleting); `label` renames it; `sort_order: 0` makes it the primary (the adapter that owns the submit — others are mirrored browser-side), the rest re-sequence; `hidden_fields` replaces the injected hidden inputs (`{ name, value }` static, `{ name, source: 'cookie', cookie_name }`, `{ name, source: 'page', page_property }`). Only what you pass changes.
 
@@ -297,7 +297,7 @@ Remove one destination by id; the others stay. If none remain, forms fall back t
 
 #### `send_test_lead` `{ funnel_id, webhook_url? }`
 
-Fire a synthetic lead (obviously fake values, zero-PII) at the funnel's saved GoHighLevel / Webhook / Zapier destination — the one delivery check a test-drive submit can't do, and what un-sticks GHL's "waiting for a sample request" field mapper. Pass `webhook_url` to test a URL before saving it. Relay the returned field list.
+Fire a synthetic lead (obviously fake values, zero-PII) at the funnel's saved GoHighLevel / Webhook / Zapier destination — the one delivery check a test-drive submit can't do, and what un-sticks GHL's "waiting for a sample request" field mapper. Provide `webhook_url` to test a URL before saving it. Relay the returned field list.
 
 #### `set_sms_verification` `{ funnel_id, enabled }`
 
@@ -309,7 +309,7 @@ Declare the typed form-field schema for the funnel (funnel-level — variants sh
 
 ### Stats
 
-> **Date windows (all stats tools).** Pass `range` (`24h | 7d | 30d | 90d`, default `7d`) for a quick window, **or** an exact span with ISO-8601 `start` / `end` (e.g. `start: "2026-06-01T00:00:00Z"`). When `start`/`end` are present they override `range`; `end` defaults to now. Use this for "since I pushed that edit at 2pm" or a specific date range. Responses carry `windowStartIso` / `windowEndIso`.
+> **Date windows (all stats tools).** Provide `range` (`24h | 7d | 30d | 90d`, default `7d`) for a quick window, **or** an exact span with ISO-8601 `start` / `end` (e.g. `start: "2026-06-01T00:00:00Z"`). When `start`/`end` are present they override `range`; `end` defaults to now. Use this for "since I pushed that edit at 2pm" or a specific date range. Responses carry `windowStartIso` / `windowEndIso`.
 
 #### `get_funnel_stats` `{ funnel_id, range?, start?, end? }`
 
@@ -358,11 +358,11 @@ Spend joined to first-party outcomes per campaign + adset (7/30d): spend/impress
 #### `get_ad_to_lander_performance` `{ window_days?, ad_id?, account_id?, platform?, mode?, rank_by? }`
 
 `rank_by` ∈ `cvr` (default, Wilson lower bound) | `rpv` | `roas` — orders the returned cells by the goal metric (use `rpv`/`roas` for SALE funnels); the confidence-gated winner stays Wilson-CVR regardless.
-**THE ad↔lander analysis.** For each ad, the lander **variants** its traffic hit, ranked by conversion rate with a confidence-gated winner. Attribution is **session-resolved** (the ad = the landing click's `utm_ad_id`; a conversion anywhere later in that session counts), so multi-step funnels join correctly. `byAd[]` → `variants[]` (visitors/conversions/qualified/cvr + 95% Wilson band `cvrLow`/`cvrHigh`, allocated CPL), `winnerVariantId` (null until one variant's interval clears the runner-up's — **never crowned on noise**), `verdict`, `projectedExtraLeads` (routing losers→winner at flat spend). `byVariant[]` is the flip (per lander variant, which ads feed it best). Pass `ad_id` to focus one ad — the same ad held constant is a clean experiment, so CVR deltas across variants are attributable to the lander. Needs live ad URLs carrying `utm_ad_id` (`get_tracking_health` flags ads missing it) + synced spend; `hasData=false` otherwise. Relay `lastSyncedAt`.
+**THE ad↔lander analysis.** For each ad, the lander **variants** its traffic hit, ranked by conversion rate with a confidence-gated winner. Attribution is **session-resolved** (the ad = the landing click's `utm_ad_id`; a conversion anywhere later in that session counts), so multi-step funnels join correctly. `byAd[]` → `variants[]` (visitors/conversions/qualified/cvr + 95% Wilson band `cvrLow`/`cvrHigh`, allocated CPL), `winnerVariantId` (null until one variant's interval clears the runner-up's — **never crowned on noise**), `verdict`, `projectedExtraLeads` (routing losers→winner at flat spend). `byVariant[]` is the flip (per lander variant, which ads feed it best). Provide `ad_id` to focus one ad — the same ad held constant is a clean experiment, so CVR deltas across variants are attributable to the lander. Needs live ad URLs carrying `utm_ad_id` (`get_tracking_health` flags ads missing it) + synced spend; `hasData=false` otherwise. Relay `lastSyncedAt`.
 
 #### `compare_ad_sets` `{ adset_a, adset_b, window_days?, account_id?, platform?, mode? }`
 
-**AI head-to-head of two ad sets.** Resolves each by adset **id or name** (case-insensitive; unique substring ok) from synced spend joined to first-party outcomes (7/30d), derives each side's metrics (spend, impressions, link clicks, conversions + **CPM, link-CTR, CVR, cost-per-conversion**), then a senior-media-buyer model picks the winner and explains **why** — naming the exact layer (CPM / link-CTR / CVR) that drives the gap, grounded in general Meta diagnostic best-practices (not pooled customer data). Efficiency (CVR + cost-per-conversion) beats raw volume. Returns `a` + `b` (the metrics judged, so you can show the numbers), `comparison` `{ winner: 'a'|'b'|'tie', headline, reasons[], recommendation }`, plus `currency` + `lastSyncedAt`. Both must resolve to **different** ad sets in the window — an ambiguous name throws with the candidate list (pass the adset id). `hasData=false` until spend is synced. Read-only: deterministic metrics + one LLM verdict.
+**AI head-to-head of two ad sets.** Resolves each by adset **id or name** (case-insensitive; unique substring ok) from synced spend joined to first-party outcomes (7/30d), derives each side's metrics (spend, impressions, link clicks, conversions + **CPM, link-CTR, CVR, cost-per-conversion**), then a senior-media-buyer model picks the winner and explains **why** — naming the exact layer (CPM / link-CTR / CVR) that drives the gap, grounded in general Meta diagnostic best-practices (not pooled customer data). Efficiency (CVR + cost-per-conversion) beats raw volume. Returns `a` + `b` (the metrics judged, so you can show the numbers), `comparison` `{ winner: 'a'|'b'|'tie', headline, reasons[], recommendation }`, plus `currency` + `lastSyncedAt`. Both must resolve to **different** ad sets in the window — an ambiguous name throws with the candidate list (provide the adset id). `hasData=false` until spend is synced. Read-only: deterministic metrics + one LLM verdict.
 
 #### `get_ad_health` `{ grain?, window_days?, account_id?, platform?, mode? }`
 
@@ -370,7 +370,7 @@ Spend joined to first-party outcomes per campaign + adset (7/30d): spend/impress
 
 #### `get_ad_breakdowns` `{ account_id, breakdown_set, since, until, campaign_id?, metric?, limit?, platform? }`
 
-**"What's working" by audience segment** — synced Meta breakdown performance (`breakdown_set`: `AGE_GENDER` | `PLACEMENT` | `REGION` | `DEVICE`) for an account over `since..until` (YYYY-MM-DD), aggregated per segment with spend/impressions/clicks + derived **CTR / CPC / CPM / CPA**. Pass `metric` to rank winners best-first (lowest CPC/CPM/CPA, highest CTR/spend/etc.); `limit` caps the count. Aggregates across campaigns unless `campaign_id` is set. Free read off the rollup. `hasData=false` until the **server-side Meta breakdown sync** (daily cron) has populated it. `reach` is an upper bound (not additive across segments).
+**"What's working" by audience segment** — synced Meta breakdown performance (`breakdown_set`: `AGE_GENDER` | `PLACEMENT` | `REGION` | `DEVICE`) for an account over `since..until` (YYYY-MM-DD), aggregated per segment with spend/impressions/clicks + derived **CTR / CPC / CPM / CPA**. Provide `metric` to rank winners best-first (lowest CPC/CPM/CPA, highest CTR/spend/etc.); `limit` caps the count. Aggregates across campaigns unless `campaign_id` is set. Free read off the rollup. `hasData=false` until the **server-side Meta breakdown sync** (daily cron) has populated it. `reach` is an upper bound (not additive across segments).
 
 #### `get_creative_performance` `{ window_days? }`
 
@@ -402,7 +402,7 @@ Creates the auto-test **and its empty bucket**. `copy_source` decides the ad tex
 
 - `winners` (default) — the brand's **Active** ad copy + headline from the Copywriting library, angle-matched.
 - `rotation` — the Active line pinned, plus up to 4 more library lines Meta rotates and reports on per text.
-- `generate` — copy written from the brand voice, the bucket's angle and ICP, and the destination page, **reviewed against Meta's Advertising Standards before it is stored**. Lines land in the library as Paused; the engine launches only after a person approves them (`update_copy_line` with `status: "winner"`), or `autopilot: "full"` approves passing lines. **Flagged lines are never launched** — relay the reasons to the user.
+- `generate` — copy written from the brand voice, the bucket's angle and ICP, and the destination page, **reviewed against Meta's Advertising Standards before it is stored**. Lines land in the library as Paused; the engine launches only after a person approves them (`update_copy_line` with `status: "winner"`), or `autopilot: "full"` approves lines that clear the rules. **Flagged lines are never launched** — relay the reasons to the user.
 - `custom` — `primary_text` verbatim.
 
 `ad_format` decides how each batch becomes ads: `one_per_creative` (default) builds one ad per creative so the rules can judge each creative; `multi_media` builds ONE Meta multi-media ad per batch carrying all of its creatives (Meta picks the asset per impression; works for lead campaigns). Say the trade-off out loud before choosing `multi_media`: the ad is the reporting unit, so per-creative results and creative-level rules are unavailable.
@@ -417,7 +417,7 @@ File bucket creatives into the auto-test. Shortcut: `upload_ad_creative` accepts
 
 #### Rule execution (experimental, opt-in)
 
-`update_testing_flow` with `rules_enabled: true` turns on the daily rule pass for that auto-test — **only after the user has agreed to the disclaimer**, which you must state plainly: it is experimental; under autopilot it can pause ads and change ad set budgets in their Meta account on its own; outcomes are not guaranteed. Pass `accept_experimental: true` with the same call once they agree. Rules: **kill** (0 conversions and spend ≥ 3× the account's median CPL → pause the ad), **promote** (≥3 conversions at ≤ 0.8× median → scale that ad set +20% in place; winners are never moved or duplicated), **retire** (frequency ≥ 2.5 and CTR down ≥ 30% week over week → pause). With `autopilot: "off"` every verdict is a **proposal**; `"kills"` applies kill/retire on its own; `"full"` applies everything. `list_testing_flows` returns open `proposals`; `decide_testing_flow_action` applies or dismisses one. Every threshold is tunable per auto-test with `update_testing_flow`'s `rule_thresholds` (kill_spend_multiple, kill_fallback_spend, promote_min_conversions, promote_cpl_ratio, retire_frequency, retire_ctr_drop, scale_factor); the response echoes the effective `ruleThresholds`.
+`update_testing_flow` with `rules_enabled: true` turns on the daily rule run for that auto-test — **only after the user has agreed to the disclaimer**, which you must state plainly: it is experimental; under autopilot it can pause ads and change ad set budgets in their Meta account on its own; outcomes are not guaranteed. Provide `accept_experimental: true` with the same call once they agree. Rules: **kill** (0 conversions and spend ≥ 3× the account's median CPL → pause the ad), **promote** (≥3 conversions at ≤ 0.8× median → scale that ad set +20% in place; winners are never moved or duplicated), **retire** (frequency ≥ 2.5 and CTR down ≥ 30% week over week → pause). With `autopilot: "off"` every verdict is a **proposal**; `"kills"` applies kill/retire on its own; `"full"` applies everything. `list_testing_flows` returns open `proposals`; `decide_testing_flow_action` applies or dismisses one. Every threshold is tunable per auto-test with `update_testing_flow`'s `rule_thresholds` (kill_spend_multiple, kill_fallback_spend, promote_min_conversions, promote_cpl_ratio, retire_frequency, retire_ctr_drop, scale_factor); the response echoes the effective `ruleThresholds`.
 
 #### `write_testing_flow_copy` `{ testing_flow_id }`
 
@@ -439,7 +439,7 @@ A campaign HUB is granvl's grouping layer (dashboard → Campaigns): a named hub
 - `get_campaign_hub` `{ hub_id, range? }` — linked funnels + ad campaigns AND the measurement rollup (7d/30d/90d). The starting point for cross-platform measurement audits.
 - `create_campaign_hub` `{ name, description?, funnel_ids?, ad_campaigns? }` — ad campaign refs are `{ platform, account_id, ad_campaign_id }` from `get_ad_entities` (level campaign).
 - `update_campaign_hub` `{ hub_id, name?, description?, add_funnel_ids?, remove_funnel_ids?, add_ad_campaigns?, remove_ad_campaigns? }` — add/remove semantics, never replace.
-- `delete_campaign_hub` `{ hub_id, confirm: true }` — archives the hub (soft delete, same as the dashboard). Linked funnels and ad campaigns are untouched; only the grouping goes away. **Confirm with the user before passing `confirm: true`.**
+- `delete_campaign_hub` `{ hub_id, confirm: true }` — archives the hub (soft delete, same as the dashboard). Linked funnels and ad campaigns are untouched; only the grouping goes away. **Confirm with the user before providing `confirm: true`.**
 
 **Offer, don't impose:** after building a funnel and its ad campaigns, OFFER to group them into a hub ("want these grouped under one campaign view?"). Never create a hub as an unrequested side effect.
 
@@ -471,7 +471,7 @@ Performance-Feed insights from the rules engine — mobile gaps, scale signals, 
 
 #### `set_qualification_rule` `{ funnel_id, rule }`
 
-Stores `Funnel.qualificationRule` JSON. On every form submit, the rule evaluates against submission data; matching submissions get a `LeadQualification(source: RULE)` row. Pass `null` to clear.
+Stores `Funnel.qualificationRule` JSON. On every form submit, the rule evaluates against submission data; matching submissions get a `LeadQualification(source: RULE)` row. Provide `null` to clear.
 
 A rule is a **group**. Each group has a combinator (`type: 'all'` = AND, `type: 'any'` = OR), zero or more leaf conditions, and zero or more child groups — at least one of conditions/children must be present. Nesting is bounded at 5 levels.
 
@@ -571,7 +571,7 @@ The workspace's research memory — **call BEFORE proposing or generating any ex
 
 #### `get_skill` `{ skill_id?, since_version? }`
 
-Fetch the latest skill bundle for self-update: `version` (content hash) + `files[]` (`{ path, content }`) + install paths. Pass `since_version` for a cheap freshness check (`upToDate: true` omits file bodies). Read-only; default `skill_id: 'granvl-app'`.
+Fetch the latest skill bundle for self-update: `version` (content hash) + `files[]` (`{ path, content }`) + install paths. Provide `since_version` for a cheap freshness check (`upToDate: true` omits file bodies). Read-only; default `skill_id: 'granvl-app'`.
 
 #### `get_activity_log` `{ limit? }`
 
@@ -634,7 +634,7 @@ The form on LANDING has `<input type="hidden" name="_next" value="{{THANK_YOU_UR
 
 ## Runtime page-serving behavior
 
-When a visitor hits `https://example.com/some-slug` (custom domain pointed at Granvl):
+When a visitor hits `/some-slug` on a custom domain pointed at Granvl:
 
 1. **Variant routing.** Server picks one variant based on weights. A `pages_variant_<pageId>` cookie pins the choice for ~30 days (sticky).
 2. **`_cv` attribution (deduped fallback).** If the URL has `?_cv=<sourceVariantId>` AND the destination is a THANK_YOU page, the source variant gets a `CONVERSION + conversionAction=form_submit + metadata.trigger=ty_page_fallback` event — but only if no client-side fire from the same visitor on the same funnel landed within 24h (24h dedup). For non-TY destinations, fires `CLICK_THROUGH` (intra-funnel navigation, NOT a conversion). Cross-funnel `_cv` is dropped.
@@ -647,9 +647,9 @@ When a visitor hits `https://example.com/some-slug` (custom domain pointed at Gr
    - **Phone formatting**: the phone field's value is reformatted to `Funnel.integrationPhoneFormat` (E.164 / 10-digit / `(650) 327-1100` / `650-327-1100`) before submit, for all destinations.
 5. **Internal-link `_cv` injection.** All same-domain `<a href>` get `_cv=<variantId>` appended automatically — no need to write it yourself.
 6. **Template substitution.** `{{THANK_YOU_URL}}` → the funnel's TY URL on the same domain.
-7. **Tracking script.** A bootstrap `<script>` is injected before `</body>`. Exposes `window.pagesTrack(eventType, metadata?)`. Posts events to `/api/f` (disguised path to dodge ad blockers). Captures scroll milestones (25/50/75/100%), Web Vitals (LCP/FCP/CLS/INP), bounce flag, server-side VIEW on first paint, **client-side form-submit listener** (fires `CONVERSION + action=form_submit` at submit time, before navigation, via `sendBeacon` so it survives the navigation), **outbound-click listener** (`CONVERSION + action=click_through` for `data-pages-convert` external links). The same-origin POST path is reachable from custom domains.
+7. **Tracking script.** A bootstrap `<script>` is injected before `</body>`. Exposes `window.pagesTrack(eventType, metadata?)`. Posts events to `/api/f` (a first-party path, so tracking is not lost to ad blockers). Captures scroll milestones (25/50/75/100%), Web Vitals (LCP/FCP/CLS/INP), bounce flag, server-side VIEW on first paint, **client-side form-submit listener** (fires `CONVERSION + action=form_submit` at submit time, before navigation, via `sendBeacon` so it survives the navigation), **outbound-click listener** (`CONVERSION + action=click_through` for `data-pages-convert` external links). The same-origin POST path is reachable from custom domains.
 8. **GTM injection** (optional). If the domain has `googleTagManagerId` set, the GTM container is injected after `<head>`.
-9. **CSP**: served landing pages do NOT carry the dashboard's strict nonce policy (that one drops `'unsafe-eval'` in production, but it never applies to customer pages). By default a served page gets no CSP header; when the domain opts into a CSP allowlist, the generated policy's `script-src` includes `'unsafe-inline'` + `'unsafe-eval'` (customer pixels paste inline scripts; GTM and the Tailwind play CDN eval) — the host allowlist is what does the constraining.
+9. **CSP**: served landing pages do NOT carry the dashboard's strict nonce policy (that stricter policy applies only to the dashboard, never to customer pages). By default a served page gets no CSP header; when the domain opts into a CSP allowlist, the generated policy's `script-src` includes `'unsafe-inline'` + `'unsafe-eval'` (customer pixels paste inline scripts; GTM and the Tailwind play CDN eval) — the host allowlist is what does the constraining.
 
 **What this means for you**: don't write any of the above yourself. Don't set form `action`/`method`, don't write the tracking script, don't add Tailwind tracking pixels, don't load GTM yourself, don't manually thread `_cv` on internal links.
 
@@ -695,7 +695,7 @@ All conversions are `type=CONVERSION` rows with `conversionAction` set to `form_
 | Click-out to external            | LANDING only                               | `CONVERSION + action=click_through + trigger=outbound_click` on the page where the click happened                                                                                                                                                   | `<a href="..." data-pages-convert>...</a>`                                                                                                                                                                                                                                                     |
 | Single-page click-through funnel | LANDING only (with `isClickThrough: true`) | The outbound click IS the conversion (`action=click_through`)                                                                                                                                                                                       | All external `<a>` are auto-tagged `data-pages-convert`. **Create with `create_funnel({ funnel_type: "click_through" })`** — that single arg sets `isClickThrough: true` AND skips the auto-generated thank-you page. Don't use `funnel_type: "standard"` then delete the thank-you afterward. |
 | Post-conversion outbound on TY   | LANDING + THANK_YOU + outbound CTA         | `CONVERSION + action=form_submit` on LANDING (from the form-submit listener) AND a separate `CONVERSION + action=click_through + trigger=outbound_click` on THANK_YOU (post-arrival outbound). Action-keyed dedup keeps these as two distinct rows. | TY page with `<a href="..." data-pages-convert>`                                                                                                                                                                                                                                               |
-| Booking inside an embedded widget (Calendly / Cal.com / HubSpot / Acuity / SavvyCal / TidyCal / custom) | Any page hosting the embed | `CONVERSION + action=embedded_widget + metadata.provider=<provider>` on the hosting page's variant, via the auto-injected postMessage listener. Only fires when the variant has `embedded_widget` set. Dedupes independently of the other actions. | Embed the widget normally in the HTML; pass `embedded_widget` (+ `embedded_widget_config` for `custom`) on `create_variant` / `update_variant` — see PAGE-BUILDING §2c |
+| Booking inside an embedded widget (Calendly / Cal.com / HubSpot / Acuity / SavvyCal / TidyCal / custom) | Any page hosting the embed | `CONVERSION + action=embedded_widget + metadata.provider=<provider>` on the hosting page's variant, via the auto-injected postMessage listener. Only fires when the variant has `embedded_widget` set. Dedupes independently of the other actions. | Embed the widget normally in the HTML; provide `embedded_widget` (+ `embedded_widget_config` for `custom`) on `create_variant` / `update_variant` — see PAGE-BUILDING §2c |
 | Custom event (video, scroll)     | Any                                        | `window.pagesTrack('CUSTOM', { metadata })`                                                                                                                                                                                                         | Inline script                                                                                                                                                                                                                                                                                  |
 
 Optional metadata on `data-pages-convert`:
@@ -716,7 +716,7 @@ Two paths populate `LeadQualification` rows. Whichever fires last wins.
 
 ### Rule-based (synchronous, internal)
 
-User defines `Funnel.qualificationRule` — JSON evaluated against form-submit data **in memory at submit time** (form values pass through the request body, the rule runs, the qualified yes/no result writes a `LeadQualification(source: RULE)` row, then the field values are discarded — zero-PII rule). Same eval runs server-side for `/api/form-submit` fallback submissions and client-side in the browser for external-CRM forms (where the values never leave the visitor's device).
+User defines `Funnel.qualificationRule` — JSON evaluated against form-submit data **in memory at submit time** (form values travel in the request body, the rule runs, the qualified yes/no result writes a `LeadQualification(source: RULE)` row, then the field values are discarded — zero-PII rule). Same eval runs server-side for `/api/form-submit` fallback submissions and client-side in the browser for external-CRM forms (where the values never leave the visitor's device).
 
 The rule is a tree of groups. Each group has a combinator (`type: 'all'` = AND, `type: 'any'` = OR) plus `conditions` and/or `children` (other groups). A flat rule is the degenerate single-group case; nest for HubSpot-style mixed logic. Bounded at 5 levels deep.
 
@@ -1114,7 +1114,7 @@ Drop this script and the `<span class="gv-error">` pattern on every field. Error
 ### "I edited the variant but the version timeline shows nothing"
 
 - `update_variant` only writes a new `VariantVersion` row when `html_content` differs from the current value. If you re-saved identical HTML, no version is recorded.
-- Pass `change_summary` and `generation_prompt` to populate the version's provenance.
+- Provide `change_summary` and `generation_prompt` to populate the version's provenance.
 
 ### "Qualified rate is 0% but rule should match"
 
@@ -1123,7 +1123,7 @@ Drop this script and the `<span class="gv-error">` pattern on every field. Error
 ### "Tailwind classes aren't applying"
 
 - `<script src="https://cdn.tailwindcss.com"></script>` must be in `<head>`.
-- The CDN compiles classes via `eval`; the page CSP allows `'unsafe-eval'` for landing pages.
+- The CDN build compiles classes in the browser at runtime; the landing-page CSP permits that.
 
 ### "Variant weights aren't taking effect"
 
@@ -1153,7 +1153,7 @@ When MCP tools fail, surface the error verbatim — the user often needs the lit
 | `Slug "X" already exists in this funnel`                                             | Page slug collision within a single funnel                                                                                                                                                                                 | Different slug                                                         |
 | `The URL "/X" is already used by another funnel ("Y") on this domain`                | Page slugs — the root `/` included — must be unique across all **live** funnels on the same domain (only a published, unarchived page claims its slug — unpublishing or archiving releases the URL). This is NOT a "one funnel per domain" rule — many funnels can share a domain, they just can't share slugs. Raised at the moment of the change (`create_page`, `update_page`, attaching a domain via `update_funnel`), not at publish. Also `Cannot connect this domain: "/X" (used by "Y") is already live on it` when attaching a domain. | Pick a different slug, move the conflicting page to a sub-path, or archive/unpublish the funnel holding the slug |
 | `Weights must sum to 100 (got N)`                                                    | `set_weights` math is wrong                                                                                                                                                                                                | Adjust weights                                                         |
-| `Must specify weights for all N variants`                                            | Partial weights update                                                                                                                                                                                                     | Pass every variant's weight                                            |
+| `Must specify weights for all N variants`                                            | Partial weights update                                                                                                                                                                                                     | Provide every variant's weight                                            |
 | `Variant X does not belong to this page`                                             | Mixed page IDs in `set_weights`                                                                                                                                                                                            | Re-fetch with `get_funnel`                                             |
 | `Deletion not confirmed. Set confirm=true to delete.`                                | Safety stub                                                                                                                                                                                                                | Confirm with the user, then call again with `confirm: true`            |
 | `Invalid rule shape: <reason>. Expected { type: 'all'\|'any', conditions: [{...}] }` | `set_qualification_rule` rule didn't parse — the reason names the exact path (e.g. `children[1].conditions[0].op="startsWith"`)                                                                                            | See [Lead qualification](#lead-qualification) for flat + nested shapes |

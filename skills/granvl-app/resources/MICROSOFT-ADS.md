@@ -53,7 +53,7 @@ Both store-backed reads depend on the sync having run. Empty result ≠ no data:
 
 Two controls that decide who actually sees the ad. Both matter more than they sound.
 
-**`location_intent` — presence vs intent.** Microsoft's default is `PEOPLE_IN_OR_SEARCHING_FOR`, which also serves someone in another country searching *about* your target market. For anything geography-bound — a licensed service, a province-specific offer, a local trade — that spends money on people who can never buy. Pass **`location_intent: "PEOPLE_IN"`** to require the searcher actually be there. Set it on `create_microsoft_search_campaign`, or on an existing campaign with `set_microsoft_location_targeting`.
+**`location_intent` — presence vs intent.** Microsoft's default is `PEOPLE_IN_OR_SEARCHING_FOR`, which also serves someone in another country searching *about* your target market. For anything geography-bound — a licensed service, a province-specific offer, a local trade — that spends money on people who can never buy. Provide **`location_intent: "PEOPLE_IN"`** to require the searcher actually be there. Set it on `create_microsoft_search_campaign`, or on an existing campaign with `set_microsoft_location_targeting`.
 
 **`excluded_location_ids` — carving a region out.** `countries` targets whole countries; to exclude a province/state/city (the classic being Quebec out of a Canada campaign, for language or regulatory reasons) pass its Microsoft LocationId.
 

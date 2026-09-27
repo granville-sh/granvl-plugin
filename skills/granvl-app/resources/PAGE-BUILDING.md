@@ -16,7 +16,7 @@ The full authoring guide for variant HTML: form wiring, quizzes, embeds, styling
 
 **Before generating any variant that contains a form, call `get_form_destinations(funnel_id)`.** It tells you whether the user has connected a third-party destination, and exactly how to wire the form so submissions go directly to that destination — Granvl is never in the data path.
 
-The tool returns `{ destinations: [...], guidance }`. **A funnel can fan out to MULTIPLE destinations** — wire the form to `destinations[0]` and Granvl's serve-time keepalive fan-out mirrors each submission to the rest, browser-side (Granvl is never in the data path for any of them). The MCP `set_form_destination` tool is non-destructive: it updates the same-provider destination in place or adds a new one alongside the others (never removing other providers unless `replace_all: true` is passed explicitly); the user can also manage destinations in the dashboard funnel **Integrations** tab. The array is one of two shapes:
+The tool returns `{ destinations: [...], guidance }`. **A funnel can fan out to MULTIPLE destinations** — wire the form to `destinations[0]` and Granvl's serve-time keepalive fan-out mirrors each submission to the rest, browser-side (Granvl is never in the data path for any of them). The MCP `set_form_destination` tool is non-destructive: it updates the same-provider destination in place or adds a new one alongside the others (never removing other providers unless `replace_all: true` is set explicitly); the user can also manage destinations in the dashboard funnel **Integrations** tab. The array is one of two shapes:
 
 ### A) `destinations: []` — no integration configured
 
@@ -365,7 +365,7 @@ Supported values:
 | "TidyCal" | `tidycal` |
 | Anything else — different provider, internal booking tool, etc. | `custom` + `embedded_widget_config` |
 
-For `custom`, also pass `embedded_widget_config`:
+For `custom`, also provide `embedded_widget_config`:
 ```ts
 {
   embedded_widget: 'custom',
@@ -462,7 +462,7 @@ A **brand kit** is a workspace-level *brand* — name, colors, fonts, radius, **
 3. **If it's genuinely empty or thin, build it out before generating pages.** Ask the user for their brand (or offer to pull it from their existing website / a brand doc / their logo), then SAVE it with `update_brand_kit` — colors, fonts, radius, `logo_url`, and especially `voice`. A good brand kit is the single biggest lever on output quality — the same campaign looks weak without brand assets and shippable with them. (Users can also view and edit kits themselves in **Settings → Brand Kits** — point them there if they want to tweak colors or the logo by hand.)
 4. Once saved, every page you generate is automatically on-brand — and so is your *copy*, because you write in the kit's `voice`.
 
-**Logo:** upload it with the `upload_image` tool first (gets a hosted Granvl URL), then pass that URL as `update_brand_kit(logo_url: ...)`. Use the logo in the variant header/footer.
+**Logo:** upload it with the `upload_image` tool first (gets a hosted Granvl URL), then provide that URL as `update_brand_kit(logo_url: ...)`. Use the logo in the variant header/footer.
 
 **Reading the kit.** Call `get_brand_kit(domain_id)` (or read `brand` from `get_funnel`):
 
@@ -532,7 +532,7 @@ A **brand kit** is a workspace-level *brand* — name, colors, fonts, radius, **
 - Use the preload + onload pattern shown above. A blocking `<link rel="stylesheet">` adds ~750ms to FCP on slow 4G — never acceptable.
 - **Max 3 weights per family.** Typical choice: `400, 600, 700`. Loading 5+ weights (e.g. `400;500;600;700;800`) bloats the font CSS and the woff2 binaries it pulls in, with no visible benefit — designers can't tell `500` from `600` in body copy.
 - Only include the `<link>` for fonts actually USED in the variant. Don't preload the brand kit's `heading` font if the variant only uses `body`.
-- Always pass `display=swap` so text stays readable while the font loads.
+- Always provide `display=swap` so text stays readable while the font loads.
 - **Defense in depth:** the serve route also auto-rewrites a bare `<link rel="stylesheet" href="...fonts.googleapis.com...">` to the preload+onload pattern at render time. If you ship the bare form by mistake the system catches it — but author it correctly anyway so the source HTML matches what visitors see, and so the skill rules stay enforceable at review time.
 
 **Two modes, very different behavior:**
@@ -647,7 +647,7 @@ PageSpeed Insights on mobile slow-4G is the bar these pages get graded against b
 
 Every `<img src>` AND every CSS `background-image: url(...)` (in inline `style` attributes OR `<style>` blocks) is automatically rewritten at bake time to route through **Granvl's own first-party image optimizer** — same-domain delivery (no third-party proxy hop), AVIF/WebP negotiation at quality 75, width capped at 800px (`<img>`) or 1200px (background), CDN-cached on the customer's domain. A 2 MB JPEG source serves as ~100 KB AVIF/WebP. **You don't need to estimate output sizes.**
 
-**The allowlist nuance (this is why `upload_image` matters):** only images hosted on Granvl's CDN (via `upload_image` or the save-time auto-rehost) and a short list of known asset hosts are rewritten into the optimizer. An image hotlinked from an arbitrary external host **passes through unoptimized** — full original bytes, third-party hop, no format conversion. Hosted images are the only path guaranteed fast.
+**The allowlist nuance (this is why `upload_image` matters):** only images hosted on Granvl's CDN (via `upload_image` or the save-time auto-rehost) and a short list of known asset hosts are rewritten into the optimizer. An image hotlinked from an arbitrary external host **is served unoptimized** — full original bytes, third-party hop, no format conversion. Hosted images are the only path guaranteed fast.
 
 What this means for you:
 
@@ -673,7 +673,7 @@ The best path for ANY image is the `upload_image` MCP tool. It returns a permane
 - SVGs — pass through unchanged (already small).
 - Relative URLs and data: URIs — left alone.
 - Total file count — embedding 30 images is still 30 network requests even if each is small. Keep total assets to a reasonable count.
-- **Images on non-allowlisted external hosts** — passed through untouched (no compression, no format conversion). The save-time auto-rehost usually moves these onto Granvl's CDN first (re-entering the optimized path), but don't rely on it — `upload_image` up front.
+- **Images on non-allowlisted external hosts** — served untouched (no compression, no format conversion). The save-time auto-rehost usually moves these onto Granvl's CDN first (re-entering the optimized path), but don't rely on it — `upload_image` up front.
 
 **Page-weight sanity cap:**
 

@@ -105,7 +105,7 @@ Cascades variants + events for that page.
 
 #### `create_variant` `{ page_id, name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, generation_prompt?, generation_model?, generation_context? }`
 
-The five attribution fields (`headline` verbatim H1, `angle_hypothesis`, `value_proposition`, `target_audience`, `form_factor`) are **required** — the call rejects without them (see SKILL.md "Variant metadata"). Status defaults to `DRAFT`. `weight` defaults to 50; sums across active variants must reach 100. `embedded_widget` ∈ `calendly | cal_com | hubspot_meetings | acuity | savvycal | tidycal | custom | null` — set it whenever the variant embeds a booking widget (with `custom`, also provide `embedded_widget_config: { originPattern, matcherJs }`); see PAGE-BUILDING §2c. `generation_*` fields are stored on the initial `VariantVersion` row (provenance shown in the version timeline — pass them when you can).
+The five attribution fields (`headline` verbatim H1, `angle_hypothesis`, `value_proposition`, `target_audience`, `form_factor`) are **required** — the call rejects without them (see SKILL.md "Variant metadata"). Status defaults to `DRAFT`. `weight` defaults to 50; sums across active variants must reach 100. `embedded_widget` ∈ `calendly | cal_com | hubspot_meetings | acuity | savvycal | tidycal | custom | null` — set it whenever the variant embeds a booking widget (with `custom`, also provide `embedded_widget_config: { originPattern, matcherJs }`); see PAGE-BUILDING §2c. `generation_*` fields are stored on the initial `VariantVersion` row (provenance shown in the version timeline — include them when you can).
 
 #### `bulk_create_variants` `{ page_id, variants: [{ name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, embedded_widget?, ... }] }`
 
@@ -177,7 +177,7 @@ Account-level domains + which funnels are connected. `brand_id` narrows to one b
 
 #### `create_domain` `{ domain }`
 
-Creates the domain in `PENDING`. The user adds DNS records; you call `verify_domain` to advance it. The response carries `ownershipRecord` + `ingressRecord`, and **sometimes a third block, `edgeRecords`** — present when the root domain is registered with another hosting account. Relay every record verbatim, including `edgeRecords`; without that one the SSL certificate is never issued even though the other two checks pass.
+Creates the domain in `PENDING`. The user adds DNS records; you call `verify_domain` to advance it. The response carries `ownershipRecord` + `ingressRecord`, and **sometimes a third block, `edgeRecords`** — present when the root domain is registered with another hosting account. Relay every record verbatim, including `edgeRecords`; without that one the SSL certificate is never issued even though the other two checks succeed.
 
 #### `get_domain` `{ domain_id }`
 
@@ -289,7 +289,7 @@ Full LeadProsper control — the dashboard mapper over MCP. `field_mappings` is 
 
 `field_map` (ActiveCampaign destinations only) replaces the field mapping — `{ "<form input name>": "<AC field name>" }`; AC's field names + `required` flags are in `get_form_destinations` → `meta.acFields`, the current map in `meta.fieldMap`. Copy a mapping between funnels by reusing the source's `meta.fieldMap` unchanged. The response warns when a required AC field is left unmapped. `{}` clears the map.
 
-Edit a saved destination without re-pasting: `enabled: false` pauses delivery but keeps the config (prefer this over deleting); `label` renames it; `sort_order: 0` makes it the primary (the adapter that owns the submit — others are mirrored browser-side), the rest re-sequence; `hidden_fields` replaces the injected hidden inputs (`{ name, value }` static, `{ name, source: 'cookie', cookie_name }`, `{ name, source: 'page', page_property }`). Only what you pass changes.
+Edit a saved destination without re-pasting: `enabled: false` pauses delivery but keeps the config (prefer this over deleting); `label` renames it; `sort_order: 0` makes it the primary (the adapter that owns the submit — others are mirrored browser-side), the rest re-sequence; `hidden_fields` replaces the injected hidden inputs (`{ name, value }` static, `{ name, source: 'cookie', cookie_name }`, `{ name, source: 'page', page_property }`). Only the fields you include change.
 
 #### `delete_form_destination` `{ funnel_id, destination_id }`
 
@@ -649,7 +649,7 @@ When a visitor hits `/some-slug` on a custom domain pointed at Granvl:
 6. **Template substitution.** `{{THANK_YOU_URL}}` → the funnel's TY URL on the same domain.
 7. **Tracking script.** A bootstrap `<script>` is injected before `</body>`. Exposes `window.pagesTrack(eventType, metadata?)`. Posts events to `/api/f` (a first-party path, so tracking is not lost to ad blockers). Captures scroll milestones (25/50/75/100%), Web Vitals (LCP/FCP/CLS/INP), bounce flag, server-side VIEW on first paint, **client-side form-submit listener** (fires `CONVERSION + action=form_submit` at submit time, before navigation, via `sendBeacon` so it survives the navigation), **outbound-click listener** (`CONVERSION + action=click_through` for `data-pages-convert` external links). The same-origin POST path is reachable from custom domains.
 8. **GTM injection** (optional). If the domain has `googleTagManagerId` set, the GTM container is injected after `<head>`.
-9. **CSP**: served landing pages do NOT carry the dashboard's strict nonce policy (that stricter policy applies only to the dashboard, never to customer pages). By default a served page gets no CSP header; when the domain opts into a CSP allowlist, the generated policy's `script-src` includes `'unsafe-inline'` + `'unsafe-eval'` (customer pixels paste inline scripts; GTM and the Tailwind play CDN eval) — the host allowlist is what does the constraining.
+9. **CSP**: served landing pages do NOT carry the dashboard's strict nonce policy (that stricter policy applies only to the dashboard, never to customer pages). By default a served page gets no CSP header; when the domain opts into a CSP allowlist, the generated policy's `script-src` includes inline-script exceptions + script-evaluation exceptions (customer pixels paste inline scripts; GTM and the Tailwind play CDN eval) — the host allowlist is what does the constraining.
 
 **What this means for you**: don't write any of the above yourself. Don't set form `action`/`method`, don't write the tracking script, don't add Tailwind tracking pixels, don't load GTM yourself, don't manually thread `_cv` on internal links.
 

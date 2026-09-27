@@ -139,7 +139,7 @@ granvl can build ad campaigns on Meta, Google (Search + Demand Gen), and Microso
 
 - **Everything is created PAUSED.** You may pause campaigns, but never enable — going live is always the human's action in the platform's own ads manager. There is deliberately no activate tool. Close every build by telling the user where to flip the switch.
 - **Budget guardrail:** daily budgets (and bids) are capped at min(the workspace admin's cap, granvl's **$200/day** platform ceiling) before any write. An over-cap request returns the cap in the error — relay it, NEVER work around it.
-- **Plain URLs, never pre-tagged:** granvl applies each platform's UTM template automatically so spend joins first-party conversions. Every destination URL you pass stays plain.
+- **Plain URLs, never pre-tagged:** granvl applies each platform's UTM template automatically so spend joins first-party conversions. Every destination URL you provide stays plain.
 - **Pages before ads:** final URLs on granvl domains must be LIVE — publish first.
 - **BROAD match keywords require `allow_broad_match: true`** — set only after the user explicitly chooses broad despite your warning.
 - **Max Conversions bidding requires `confirm_conversion_tracking: true`** — set only after the USER confirms conversion tracking is wired (Google: GA4-imported conversion action; Microsoft: a UET goal with volume). Never set it unprompted.
@@ -329,7 +329,7 @@ several client workspaces                  switch_workspace        (by id or nam
 "Fork this" / "make a version of X"      → get_variant_html     (read what's there)
 "Copy this winning page to my funnel"      duplicate_variant    (creates DRAFT copy, weight: 0)
 "Iterate on [teammate]'s page"             update_variant       (iterate on the COPY, not the source)
-                                           # Cross-funnel: pass target_page_id
+                                           # Cross-funnel: provide target_page_id
                                            # Same-type pages only (LANDING→LANDING etc.)
 
 "Clone [teammate]'s funnel"              → duplicate_funnel     (full pages + variants, DRAFT)
@@ -344,7 +344,7 @@ several client workspaces                  switch_workspace        (by id or nam
 "Map / copy ActiveCampaign fields"       → get_form_destinations (meta.acFields = AC's fields + required flags,
                                            meta.fieldMap = current map) → update_form_destination({ field_map })
                                            # { "<form input name>": "<AC field name>" }. To copy a mapping to
-                                           # another funnel, read the source's meta.fieldMap and pass it as-is.
+                                           # another funnel, read the source's meta.fieldMap and provide it as-is.
                                            # Map every required AC field or AC rejects the lead.
 "Remove this integration"                → delete_form_destination (one by id; confirm first)
 
@@ -437,7 +437,7 @@ If the user picks shape 5 or 6, do one follow-up to confirm the page list before
 
 `create_funnel` requires a `platform` value (`META`, `GOOGLE_SEARCH`, `TIKTOK`, `LINKEDIN`, `REDDIT`, `X`, `PINTEREST`, `SNAPCHAT`, `MICROSOFT_SEARCH`, `MICROSOFT_AUDIENCE`, `GOOGLE_DEMAND_GEN`, `GOOGLE_DISPLAY`, `YOUTUBE`, `YOUTUBE_SHORTS`, `PERFORMANCE_MAX`, `ORGANIC`, `EMAIL`, `OTHER`). Without it, channel-level rollups break and there's no way to ask _"how's TikTok converting vs. Meta?"_ later.
 
-1. **If the user mentioned a platform in passing** → confirm casually: _"Building this for Meta — sound right?"_
+1. **If the user mentioned a platform casually** → confirm casually: _"Building this for Meta — sound right?"_
 2. **If they didn't** → ask before calling `create_funnel`, phrased like a person: _"Which platform is this for — Meta, Google Search, TikTok, something else?"_
 3. **If they genuinely don't know yet** → use `OTHER` and note they can change it in Settings → Funnel. Don't guess.
 
@@ -473,7 +473,7 @@ The server REFUSES `create_variant` / `update_variant` / `patch_variant_html` / 
 
 These conventions are enforced by the serve pipeline. Violating them won't reject the variant on write, but the page will mis-track at runtime.
 
-**Scaffold first, always.** Before authoring any NEW variant HTML, call `get_page_scaffold(page_type)` and build on what it returns — a contract-perfect skeleton (control-field placement, form shape, `data-step` sections, `<main>` landmark) guaranteed to provide the write-time audit and the publish validator with zero warnings. Replace the `REPLACE:` markers with real content; keep the structure exactly as given. Freehand HTML is how contract violations happen; the scaffold is how pages come out correct on the first pass regardless of which model is driving.
+**Scaffold first, always.** Before authoring any NEW variant HTML, call `get_page_scaffold(page_type)` and build on what it returns — a contract-perfect skeleton (control-field placement, form shape, `data-step` sections, `<main>` landmark) guaranteed to clear the write-time audit and the publish validator with zero warnings. Replace the `REPLACE:` markers with real content; keep the structure exactly as given. Freehand HTML is how contract violations happen; the scaffold is how pages come out correct on the first provide regardless of which model is driving.
 
 **Before generating or editing ANY variant HTML, STOP and read [resources/PAGE-BUILDING.md](./resources/PAGE-BUILDING.md)** — it has the full form-wiring guide, quiz scaffold, embed tables, styling paths, brand-kit application, a11y and performance detail, and the publish-validator code playbook. Do not author page HTML from memory. The hard rules it expands on:
 

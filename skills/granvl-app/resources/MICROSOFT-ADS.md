@@ -8,7 +8,7 @@ Microsoft Advertising (Bing + Yahoo + DuckDuckGo + Edge/Windows surfaces) is the
 
 - The three bidding recipes (Max Clicks + ceiling → launch default; Manual/Enhanced CPC; Max Conversions only after the user confirms a UET conversion goal with volume — `confirm_conversion_tracking: true`, never set it unprompted).
 - STAG structure: one theme per ad group, phrase/exact keywords, one lander per theme, everything lands PAUSED (you may pause, never enable).
-- RSA copy limits are IDENTICAL (3–15 headlines ≤30 chars, 2–4 descriptions ≤90 chars) — reuse the Google copy spread verbatim on the first pass.
+- RSA copy limits are IDENTICAL (3–15 headlines ≤30 chars, 2–4 descriptions ≤90 chars) — reuse the Google copy spread verbatim on the first provide.
 - Plain `final_url`s — the campaign-wide Microsoft UTM suffix ({CampaignId} macros) is applied automatically.
 - The budget guardrail: `daily_budget_usd` (and any bid) is capped at min(workspace admin's cap, granvl's **$200/day** platform ceiling) before any write.
 
@@ -55,7 +55,7 @@ Two controls that decide who actually sees the ad. Both matter more than they so
 
 **`location_intent` — presence vs intent.** Microsoft's default is `PEOPLE_IN_OR_SEARCHING_FOR`, which also serves someone in another country searching *about* your target market. For anything geography-bound — a licensed service, a province-specific offer, a local trade — that spends money on people who can never buy. Provide **`location_intent: "PEOPLE_IN"`** to require the searcher actually be there. Set it on `create_microsoft_search_campaign`, or on an existing campaign with `set_microsoft_location_targeting`.
 
-**`excluded_location_ids` — carving a region out.** `countries` targets whole countries; to exclude a province/state/city (the classic being Quebec out of a Canada campaign, for language or regulatory reasons) pass its Microsoft LocationId.
+**`excluded_location_ids` — carving a region out.** `countries` targets whole countries; to exclude a province/state/city (the classic being Quebec out of a Canada campaign, for language or regulatory reasons) provide its Microsoft LocationId.
 
 **Always resolve ids with `search_microsoft_locations`.** Never hand-write one. Microsoft's location ids are their own id space, and a wrong id excludes the *wrong region* while the campaign still looks perfectly targeted — a silent miss you'd only catch in the geo report weeks later. Scope with `country_code`, since place names repeat across countries, and check `canonicalName` before picking: results are ranked broadest-first so a province outranks a same-named city, but confirm.
 

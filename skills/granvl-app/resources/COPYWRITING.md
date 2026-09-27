@@ -130,7 +130,7 @@ Kinds: `headline`, `subheadline` (surface `landing`); `ad_primary`,
 Hard limits enforced by granvl: ad headline **30 characters**, ad description
 **90 characters**. Validate the complete batch before saving or building.
 
-When copy is used on a page, pass its ids as `copy_line_ids` to
+When copy is used on a page, provide its ids as `copy_line_ids` to
 `create_variant` / `update_variant`. When it is used in a campaign, retain the
-ids in each review cell and pass their union to `save_campaign_draft`. Lineage
+ids in each review cell and provide their union to `save_campaign_draft`. Lineage
 is what lets later warehouse performance update the right hypothesis.

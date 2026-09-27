@@ -221,7 +221,7 @@ Look at the variant rows (visitors, conversions, primaryMetric, convRatePct, qua
 
 If any fails, push back: *"v2 only has 73 visitors — too early to call. Want to wait until each variant has at least 100 visitors?"*
 
-If the heuristics pass, proceed.
+If the heuristics succeed, proceed.
 
 ### Step 2 — Pause the variant (route its traffic away)
 
@@ -626,7 +626,7 @@ You can't read the user's Meta account; they paste in:
 
 > "I need two things from your Meta Events Manager:
 > 1. **Pixel ID** — the long number at the top of your pixel page.
-> 2. **CAPI access token** — Settings tab on the same page, click *Generate access token*. Enter that one yourself in granvl → Settings → Tracking → Meta (tokens are never pasted into chat or passed over MCP).
+> 2. **CAPI access token** — Settings tab on the same page, click *Generate access token*. Enter that one yourself in granvl → Settings → Tracking → Meta (tokens are never pasted into chat or provided over MCP).
 > Give me the Pixel ID here and I'll wire it up."
 
 ### Step 3 — Save via update_domain_tracking

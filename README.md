@@ -5,7 +5,7 @@ granvl is an AI-native landing-page and performance-analytics platform. This plu
 ## What it contains
 
 - **MCP connector** — the remote granvl MCP server at `https://app.granvl.com/api/mcp` (Streamable HTTP, OAuth 2.1 with PKCE). It is the only thing the plugin connects to. Sign in with your granvl account when the client asks; every tool call is scoped to the workspace you choose.
-- **granvl-app skill** — the usage guide the agent reads before building: page-building rules, form and conversion-tracking conventions, the Google / Meta / Microsoft campaign playbooks, and how to read granvl's analytics. Skill version: `1.0.0-e66673344ad9`.
+- **granvl-app skill** — the usage guide the agent reads before building: page-building rules, form and conversion-tracking conventions, the Google / Meta / Microsoft campaign playbooks, and how to read granvl's analytics. Skill version: `1.0.0-a9673fd0b2be`.
 
 Nothing in this plugin runs locally: no scripts, no hooks, no local servers. The skill is documentation; the connector is a URL.
 

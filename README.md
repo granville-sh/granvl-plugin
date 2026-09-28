@@ -1,6 +1,6 @@
 # granvl plugin
 
-granvl is an AI-native landing-page and performance-analytics platform. This plugin connects your agent (Claude, ChatGPT, Codex, Cursor) to a granvl workspace and teaches it how to use the platform well.
+granvl is an AI-native landing-page and performance-analytics platform. This plugin connects your agent (Claude, ChatGPT, Codex, Grok Bot, Cursor) to a granvl workspace and teaches it how to use the platform well.
 
 ## What it contains
 

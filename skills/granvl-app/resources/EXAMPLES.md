@@ -713,8 +713,7 @@ Find the `<h1>` (or whatever wraps the headline) and replace its text. Keep ever
 update_variant({
   variant_id: "<v3 id>",
   html_content: "<edited HTML>",
-  change_summary: "Replaced headline with '7 days, no resume' offer",
-  generation_prompt: "Change the headline to 'Get hired in 7 days — no resume required'"
+  change_summary: "Replaced headline with '7 days, no resume' offer"
 })
 ```
 

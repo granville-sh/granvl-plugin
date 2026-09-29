@@ -103,15 +103,15 @@ Cascades variants + events for that page.
 
 `page_type` ∈ `LANDING | QUIZ | THANK_YOU | MAGNET`. Returns the canonical, contract-perfect HTML skeleton for that page type — guaranteed zero audit warnings and zero publish auto-fixes. **Call this before authoring any new variant** and replace its `REPLACE:` markers with real content, keeping the structure (control-field placement, form shape, `data-step` sections, `<main>`) exactly as given.
 
-#### `create_variant` `{ page_id, name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, generation_prompt?, generation_model?, generation_context? }`
+#### `create_variant` `{ page_id, name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config? }`
 
-The five attribution fields (`headline` verbatim H1, `angle_hypothesis`, `value_proposition`, `target_audience`, `form_factor`) are **required** — the call rejects without them (see SKILL.md "Variant metadata"). Status defaults to `DRAFT`. `weight` defaults to 50; sums across active variants must reach 100. `embedded_widget` ∈ `calendly | cal_com | hubspot_meetings | acuity | savvycal | tidycal | custom | null` — set it whenever the variant embeds a booking widget (with `custom`, also provide `embedded_widget_config: { originPattern, matcherJs }`); see PAGE-BUILDING §2c. `generation_*` fields are stored on the initial `VariantVersion` row (provenance shown in the version timeline — include them when you can).
+The five attribution fields (`headline` verbatim H1, `angle_hypothesis`, `value_proposition`, `target_audience`, `form_factor`) are **required** — the call rejects without them (see SKILL.md "Variant metadata"). Status defaults to `DRAFT`. `weight` defaults to 50; sums across active variants must reach 100. `embedded_widget` ∈ `calendly | cal_com | hubspot_meetings | acuity | savvycal | tidycal | custom | null` — set it whenever the variant embeds a booking widget (with `custom`, also provide `embedded_widget_config: { originPattern, matcherJs }`); see PAGE-BUILDING §2c.
 
 #### `bulk_create_variants` `{ page_id, variants: [{ name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, embedded_widget?, ... }] }`
 
 Same shape as `create_variant`, batched — including the five required attribution fields **per item**. 1–10 variants per call. Faster than N round-trips when generating a fresh test.
 
-#### `update_variant` `{ variant_id, name?, html_content?, weight?, headline?, angle_hypothesis?, value_proposition?, target_audience?, form_factor?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, generation_prompt?, generation_model?, generation_context?, change_summary?, acknowledge_stat_pollution? }`
+#### `update_variant` `{ variant_id, name?, html_content?, weight?, headline?, angle_hypothesis?, value_proposition?, target_audience?, form_factor?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, change_summary?, acknowledge_stat_pollution? }`
 
 **When `html_content` differs from the current value**, a new `VariantVersion` row is written automatically with `source: AI_EDITED`. Provide `change_summary` (one-liner like "Tightened headline; swapped CTA color") so the version timeline tells the iteration story, and re-articulate the attribution fields whenever the edit shifts headline / angle / value-prop / form. `acknowledge_stat_pollution: true` is the guardrail escape hatch — only after the USER explicitly consents (see SKILL.md).
 
@@ -143,7 +143,7 @@ Clone an entire funnel — all pages + variants — as a DRAFT copy owned by the
 
 #### `list_variant_versions` `{ variant_id, include_html?, limit? }`
 
-Every saved version with provenance. Each row carries `source` (AI_GENERATED / AI_EDITED / HUMAN_EDITED / IMPORTED / BACKFILL), `generation_prompt`, `generation_model`, `change_summary`, `created_at`. HTML omitted by default — provide `include_html: true` to fetch it (use for diff-style comparisons).
+Every saved version with provenance. Each row carries `source` (AI_GENERATED / AI_EDITED / HUMAN_EDITED / IMPORTED / BACKFILL), `change_summary`, `created_at`. HTML omitted by default — provide `include_html: true` to fetch it (use for diff-style comparisons).
 
 #### `get_variant_html_at_time` `{ variant_id, timestamp }`
 
@@ -382,7 +382,7 @@ Spend joined to first-party outcomes per campaign + adset (7/30d): spend/impress
 
 #### `start_creative_upload` `{ filename, bytes, sha256, mime }` → `finish_creative_upload` `{ storage_key, filename, sha256, mime, … }`
 
-Direct upload for LOCAL creative files — the path for any video on disk and for images over 3 MB. Caps match the dashboard: **images 30 MB, video 250 MB**. Compute `sha256` with `shasum -a 256 <file>` (a hash already in the bucket returns the existing creative, no upload). PUT the raw bytes to `upload_url` with `Content-Type: <mime>` exactly as given in `next_step`, then call `finish_creative_upload` with the `storage_key`. Every upload is sniffed: a file whose bytes are not the declared image/video type is deleted and the call errors — fix the file or the mime, don't retry blindly. `finish` takes the same optional persona stamp / `generation_prompt` / `testing_flow_id` as `upload_ad_creative`.
+Direct upload for LOCAL creative files — the path for any video on disk and for images over 3 MB. Caps match the dashboard: **images 30 MB, video 250 MB**. Compute `sha256` with `shasum -a 256 <file>` (a hash already in the bucket returns the existing creative, no upload). PUT the raw bytes to `upload_url` with `Content-Type: <mime>` exactly as given in `next_step`, then call `finish_creative_upload` with the `storage_key`. Every upload is sniffed: a file whose bytes are not the declared image/video type is deleted and the call errors — fix the file or the mime, don't retry blindly. `finish` takes the same optional persona stamp / `testing_flow_id` as `upload_ad_creative`.
 
 #### `list_ad_creatives` `{}`
 
@@ -792,8 +792,7 @@ User: "change the headline on Hero v3 to 'Free 30-day trial'"
 3.  update_variant({
       variant_id,
       html_content: <edited HTML>,
-      change_summary: "Replaced headline with '30-day trial' offer",
-      generation_prompt: "Replace headline with 'Free 30-day trial'"
+      change_summary: "Replaced headline with '30-day trial' offer"
     })
 ```
 
@@ -1114,7 +1113,7 @@ Drop this script and the `<span class="gv-error">` pattern on every field. Error
 ### "I edited the variant but the version timeline shows nothing"
 
 - `update_variant` only writes a new `VariantVersion` row when `html_content` differs from the current value. If you re-saved identical HTML, no version is recorded.
-- Provide `change_summary` and `generation_prompt` to populate the version's provenance.
+- Provide `change_summary` to label the version (what changed and why, in one line).
 
 ### "Qualified rate is 0% but rule should match"
 

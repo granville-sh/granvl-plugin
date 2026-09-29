@@ -543,9 +543,9 @@ For a small change to an existing variant, **DO NOT regenerate the entire HTML f
 
 1. `get_variant_html(variant_id)` — pull the current HTML
 2. Make the targeted change
-3. `update_variant(variant_id, html_content, change_summary, generation_prompt?)`
+3. `update_variant(variant_id, html_content, change_summary)`
 
-**ALWAYS provide `change_summary`** — a tight one-liner of what you changed and why. It becomes the label on the edit markers in `get_variant_history`; an unlabeled marker forces the reader to guess. Provide `generation_prompt` when the change came from a specific user instruction.
+**ALWAYS provide `change_summary`** — a tight one-liner of what you changed and why. It becomes the label on the edit markers in `get_variant_history`; an unlabeled marker forces the reader to guess.
 
 **Edit vs. new variant — default to EDIT.** _"Change / edit / fix / tweak / update X"_ → `update_variant` on that same variant, and keep using the _same_ variant id across iteration rounds (five tweaks = five updates to one id, not five new variants). Call `create_variant` / `bulk_create_variants` **only** when the user explicitly wants a new variant alongside (_"new variant"_, _"A/B test this against..."_). Zero-traffic funnels: edit in place, always — new-variant clutter has no upside there.
 

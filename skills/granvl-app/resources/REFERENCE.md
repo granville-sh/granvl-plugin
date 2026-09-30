@@ -337,7 +337,7 @@ Portfolio rollup across **all** funnels in the workspace. `group_by: 'funnel'` (
 
 #### `record_ad_entities` `{ entities[], source?, note? }`
 
-**Write the user's ad-account state into Granvl** — campaigns/adsets/ads pulled from THEIR ad-platform or Supermetrics MCP. Granvl becomes the persistent memory of the ad account: sync daily instead of re-pulling Supermetrics every session. Idempotent batch upsert (max 200/call). **Always include `destination_url` (the ad's final URL) and `configured_utms` (the raw url_tags string) when the source exposes them** — they power Tracking Health (dead-page + broken-UTM detection) and the spend→page join fallback. History is captured server-side: any change to status/URL/UTMs/names is auto-ledgered, and URL/UTM changes roll a validity period so spend joins to what the ad pointed at _on that date_. **When YOU just changed something on the ad platform (paused an adset, edited a URL), report it here with `source: 'agent'` + a short reason in `note`** ("paused — CPQL $84 over 7 days") — that provenance feeds change-mapped analytics.
+**Write the user's ad-account state into Granvl** — campaigns/adsets/ads from data read out of the user's own ad account. The stored copy is what spend and tracking reports read from; sync daily. Idempotent batch upsert (max 200/call). **Always include `destination_url` (the ad's final URL) and `configured_utms` (the raw url_tags string) when the source exposes them** — they power Tracking Health (dead-page + broken-UTM detection) and the spend→page join fallback. History is captured server-side: any change to status/URL/UTMs/names is auto-ledgered, and URL/UTM changes roll a validity period so spend joins to what the ad pointed at _on that date_. **When YOU just changed something on the ad platform (paused an adset, edited a URL), report it here with `source: 'agent'` + a short reason in `note`** ("paused — CPQL $84 over 7 days") — that provenance feeds change-mapped analytics.
 
 #### `record_ad_spend` `{ rows[] }`
 
@@ -345,7 +345,7 @@ Portfolio rollup across **all** funnels in the workspace. `group_by: 'funnel'` (
 
 #### `get_ad_entities` `{ platform?, level?, campaign_id?, status? }`
 
-Read the synced ad-account state — Granvl's **persistent memory** of the user's campaigns/adsets/ads (status, destination URLs, configured UTMs, `lastSyncedAt`). **Use this instead of re-pulling Supermetrics** when you just need to know what exists. If `lastSyncedAt` is old, offer to run the sync recipe.
+Read the synced ad-account state — Granvl's **persistent memory** of the user's campaigns/adsets/ads (status, destination URLs, configured UTMs, `lastSyncedAt`). **Read from here** when you just need to know what exists. If `lastSyncedAt` is old, offer to run the sync recipe.
 
 #### `get_tracking_health` `{}`
 

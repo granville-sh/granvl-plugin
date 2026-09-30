@@ -119,7 +119,7 @@ Note on **Campaigns** (the granvl grouping hubs that link funnels + ad campaigns
 ### Sync and action boundary
 
 - If history is unavailable, surface the connection/sync reason and send the user to the Ads connection or sync remedy returned by Granvl. Do not import history yourself.
-- Campaign creation and updates go through Granvl's guarded tools only. They enforce tenant scope, API quotas, budget limits, and paused defaults. Do not call a separate ad-platform MCP to route around a Granvl guardrail.
+- Campaign creation and updates go through Granvl's guarded tools only. They enforce tenant scope, API quotas, budget limits, and paused defaults. When a guardrail refuses a request, relay the limit to the user; do not look for another way to make the same change.
 - When building pages/links, follow the workspace UTM convention (`utm_source`, `utm_campaign`, `utm_adgroup` at minimum) so the warehouse can join spend to first-party outcomes.
 
 ### Answering spend + optimization questions

@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "granvl",
-  "version": "1.0.0-02b961b95583",
+  "version": "1.0.1-2536b78e1550",
   "description": "Build, deploy, A/B test and optimize landing pages and paid campaigns on granvl — hosting, first-party analytics and privacy-first lead delivery, driven from your AI agent.",
   "author": {
     "name": "Granville Technologies Inc.",
@@ -24,12 +24,88 @@
     "com.openai": {
       "interface": {
         "displayName": "granvl",
-        "shortDescription": "Landing pages, A/B tests and ad campaigns your agent builds and optimizes.",
-        "longDescription": "granvl is an AI-native landing-page and analytics platform. Connect it and your agent can create funnels, write and publish page variants, split traffic, read first-party conversion analytics joined to ad spend, and build paused Google, Meta and Microsoft campaigns — while lead contact details go straight from the visitor's browser to your CRM, never through granvl.",
-        "category": "marketing",
+        "shortDescription": "Build and test landing pages",
+        "longDescription": "granvl connects your agent to a marketing workspace. For marketers, agencies and founders running paid traffic: create funnels, write and publish landing pages and quizzes, split traffic between variants, read first-party visitor and conversion analytics joined to ad spend, configure lead delivery to your CRM, and build paused Google, Meta and Microsoft campaigns. Limits: granvl never enables an ad campaign or raises a budget on its own; a person does that in the ad platform. Lead contact details go from the visitor's browser to your CRM and are not stored by granvl. A granvl account is required.",
+        "developerName": "Granville Technologies Inc.",
+        "category": "Business & Operations",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://granvl.com",
+        "supportURL": "https://granvl.com/contact",
+        "privacyPolicyURL": "https://granvl.com/privacy",
+        "termsOfServiceURL": "https://granvl.com/terms",
+        "defaultPrompt": [
+          "Use granvl to list my funnels and show which one converts best.",
+          "Use granvl to build a quiz landing page from the card quiz template.",
+          "Use granvl to split traffic 50/50 between two headline variants."
+        ],
         "brandColor": "#000000",
+        "brandColorDark": "#FFFFFF",
         "composerIcon": "./assets/icon.png",
-        "logo": "./assets/logo.png"
+        "composerIconDark": "./assets/icon-light.png",
+        "logo": "./assets/icon.png",
+        "logoDark": "./assets/icon-light.png"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Inspect the connected workspace and its funnels.",
+              "prompt": "Using granvl, load my workspace context and list my funnels.",
+              "tools_triggered": "list_workspaces, list_funnels, list_domains, get_brand_kit",
+              "expected_behavior": "Identifies the active workspace and lists accessible funnels, statuses, domains, and available brand context."
+            },
+            {
+              "description": "Create a named funnel from a template.",
+              "prompt": "Create a new funnel called Spring Roof Inspection for Google Ads using the card quiz template, then give me the preview URL for the first page.",
+              "tools_triggered": "list_funnels, list_templates, create_funnel_from_template, update_funnel, get_variant_html",
+              "expected_behavior": "Creates a new draft from the card quiz template, sets Google Search attribution, and returns the first-page preview URL without enabling advertising."
+            },
+            {
+              "description": "Edit an existing quiz headline.",
+              "prompt": "On the Spring Roof Inspection quiz variant, change the headline to Roof problems do not wait for spring and give me the preview link again.",
+              "tools_triggered": "list_funnels, get_funnel, get_variant_html, patch_variant_html",
+              "expected_behavior": "Changes the specified headline in the existing variant, preserves unrelated content, and returns a preview URL."
+            },
+            {
+              "description": "Create and configure a two-variant experiment.",
+              "prompt": "Duplicate the Spring Roof Inspection quiz variant with a question-style headline, then split traffic 50/50 between the two.",
+              "tools_triggered": "list_funnels, get_funnel, get_research_history, get_variant_html, duplicate_variant, patch_variant_html, update_variant, set_weights",
+              "expected_behavior": "Creates a second variant, updates its headline and experiment metadata, and verifies equal traffic weights without changing the original headline."
+            },
+            {
+              "description": "Inspect analytics, including an empty-data case.",
+              "prompt": "Pull visitor analytics for Spring Roof Inspection and suggest what to improve.",
+              "tools_triggered": "list_funnels, get_funnel_stats, get_step_funnel, get_segmented_stats, get_research_history",
+              "expected_behavior": "Reports the selected time window, visitors, conversions, available source/device and step breakdowns; distinguishes missing data from poor performance and does not declare a winner from an inadequate sample."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Unrelated calendar request.",
+              "prompt": "What meetings do I have tomorrow?",
+              "expected_behavior": "Do not invoke granvl; calendar scheduling is outside its supported workflows."
+            },
+            {
+              "description": "General writing request with no workspace action.",
+              "prompt": "Write a birthday message for my sister.",
+              "expected_behavior": "Respond directly without invoking granvl."
+            },
+            {
+              "description": "Unrelated consumer transaction.",
+              "prompt": "Order a pizza for delivery tonight.",
+              "expected_behavior": "Do not invoke granvl; food ordering is outside its supported workflows."
+            }
+          ]
+        },
+        "demo_recording_url": "https://www.tella.tv/video/granvl-plugin-f3s1",
+        "commerce": false,
+        "commerce_description": "granvl does not sell or take payment inside ChatGPT. Subscriptions are purchased on granvl.com."
+      },
+      "publication": {
+        "release_notes": "Corrected tool annotations after a full audit of every tool against its behavior, with a justification for each. Removed input fields that were not needed to fulfil requests."
       }
     }
   }

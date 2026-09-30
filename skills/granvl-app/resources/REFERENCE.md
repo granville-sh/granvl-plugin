@@ -301,7 +301,7 @@ Fire a synthetic lead (obviously fake values, zero-PII) at the funnel's saved Go
 
 #### `set_sms_verification` `{ funnel_id, enabled }`
 
-Toggle SMS phone verification (texted 6-digit code gates every form submit — filters bots/burners on high-CPL paid traffic). 100 free verifications per team, then prepaid credits (10¢ each); fails OPEN at 0 credits. Surface the returned credit balance when low. Skipped in test mode.
+Toggle SMS phone verification (texted 6-digit code gates every form submit — filters bots/burners on high-CPL paid traffic). Each verification uses one SMS credit from the team's balance (Billing page); fails OPEN at 0 credits. Surface the returned credit balance when low. Skipped in test mode.
 
 #### `set_funnel_form_fields` `{ funnel_id, fields: [{ name, type, label?, options? }] }`
 

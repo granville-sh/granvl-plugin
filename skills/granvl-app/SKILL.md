@@ -143,7 +143,7 @@ granvl can build ad campaigns on Meta, Google (Search + Demand Gen), and Microso
 - **Pages before ads:** final URLs on granvl domains must be LIVE — publish first.
 - **BROAD match keywords require `allow_broad_match: true`** — set only after the user explicitly chooses broad despite your warning.
 - **Max Conversions bidding requires `confirm_conversion_tracking: true`** — set only after the USER confirms conversion tracking is wired (Google: GA4-imported conversion action; Microsoft: a UET goal with volume). Never set it unprompted.
-- **Regulated verticals on Meta need `special_ad_category`** (financial / housing / employment / political) — ask if the offer looks like one.
+- **Regulated verticals on Meta need `special_ad_category`** (financial / housing / employment / political) — ask if the offer looks like one. On such a campaign Meta fixes the audience, and granvl refuses any adjustment before writing: no location exclusions (target provinces / states with `region_keys` instead), age stays 18–65+, gender `all`, no `interest_ids`.
 - **Microsoft limits:** negative keywords are PHRASE/EXACT only; country targeting currently US / CA / GB / AU only.
 - **After a guarded platform write,** rely on Granvl's audited write path and next warehouse sync. Do not manually re-record the entity.
 

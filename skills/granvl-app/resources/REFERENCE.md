@@ -525,7 +525,7 @@ Manual override (`source: MANUAL`). Webhook updates beat manual; manual beats ru
 
 #### `get_qualify_webhook_url` `{}`
 
-Returns the workspace's deal-close webhook URL. Paste into the user's CRM / Zapier; the CRM POSTs back when a deal closes with `{ session_id, qualified, value?, reason? }`.
+Returns a deal-close webhook URL bound to the current workspace. Paste into the user's CRM / Zapier; the CRM POSTs back when a deal closes with `{ session_id, qualified, value?, reason? }`. The workspace URL is stored only as a fingerprint: the FIRST call creates it and returns it once — later calls return `url: null` + its prefix and never rotate it (the user rotates from the funnel's Qualification tab). Pass `domain_id` for a domain's own URL, which can be re-read any time.
 
 ### Sessions + journeys
 
@@ -762,7 +762,7 @@ Content-Type: application/json
 }
 ```
 
-`get_qualify_webhook_url()` returns the live URL (it carries a per-workspace token, rotateable from the dashboard) plus setup instructions. Never construct this URL by hand.
+`get_qualify_webhook_url()` returns the workspace URL (bound to this workspace) plus setup instructions — once, on the call that creates it; afterwards `url` is null and the user rotates it from the dashboard. Never construct this URL by hand.
 
 ### Stats integration
 

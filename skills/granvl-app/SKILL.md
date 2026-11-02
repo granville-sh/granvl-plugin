@@ -72,9 +72,17 @@ If you got this skill through the granvl plugin, it updates with the plugin — 
 
 ## START HERE — get your bearings every session
 
-**Before anything else — building, editing, advising — call `get_workspace_context`.** It returns the workspace's `granvl.md`: a CLAUDE.md-style memory file (business type, brands/domains in play, audience, voice, accumulated CRO learnings). Read it, follow it, keep it current with `update_workspace_context` (whole-file replace: read, modify, write the complete doc back). When it comes back `empty`, run the intake below and save the result before building. Then call `list_funnels`, and `get_brand_kit` for the domain you're about to touch.\*\* Together they tell you what's already live and what this customer looks and sounds like. Building without reading them is how a generic page happens.
+**Before anything else — building, editing, advising — call `get_workspace_context`.** It returns the workspace's `granvl.md`: a CLAUDE.md-style memory file (business type, brands/domains in play, audience, voice, accumulated CRO learnings). Read it, follow it, keep it current with `update_workspace_context` (whole-file replace: read, modify, write the complete doc back). When it comes back `empty`, run the intake below and save the result before building (no workspace at all → the first case below). Then call `list_funnels`, and `get_brand_kit` for the domain you're about to touch.\*\* Together they tell you what's already live and what this customer looks and sounds like. Building without reading them is how a generic page happens.
 
 Brand specifics — colors, fonts, logo, voice — live in the **brand kit**, per domain. Durable CRO findings live in **learnings** (`save_learning` / `list_learnings`), per funnel. Those two are your memory between sessions; keep them fed.
+
+### No workspace yet → create it from here, then carry on
+
+If any tool answers **"No workspace yet"** — the user's first contact with granvl is you, so `get_workspace_context`, `list_funnels` and `list_workspaces` come back empty with that `next` — ask one line: _"What's the business called, and its website if it has one?"_ Then call `create_workspace({ name, website_url?, business_type? })` (`business_type`: `agency` | `business` | `solo`, when they've said). It becomes the active workspace for this connection, so go straight on to the intake below and the first page. Never send them to the dashboard to make one.
+
+- Call it only on that answer. With a workspace already active it returns that one (`created: false`) and creates nothing; `allow_additional: true` is for an agency adding a client.
+- It does not extract a brand kit from the website: use the site in the intake (name, voice, look) and fill the brand kit once there's a domain.
+- Refused on API-key connections (a key is bound to one workspace).
 
 ### Fresh workspace → run the intake ("grill me")
 
@@ -95,7 +103,7 @@ When it's a **fresh workspace** — `list_funnels` returns nothing — the user 
 Sequence — keep it fast, one of each, minimal back-and-forth:
 
 1. `create_funnel` (`funnel_type: "standard"`) — name it after their business/offer; set `platform` from what they told you (omit if unknown). This auto-bootstraps a `LANDING` and a `THANK_YOU` page — grab the **LANDING** page's `id` from the response (no `create_page` needed).
-2. `create_variant` on that LANDING page — one clean, on-brand hero: headline + subhead + a single primary CTA + one supporting section. If a brand kit exists (`get_brand_kit`), pull its colors/fonts — onboarding often auto-extracts one from the user's website (`sourceUrl` set, `screenshots[]` for look-and-feel); otherwise tasteful defaults. Keep it genuinely simple — a strong first draft, not a finished site.
+2. `create_variant` on that LANDING page — one clean, on-brand hero: headline + subhead + a single primary CTA + one supporting section. If a brand kit exists (`get_brand_kit`), pull its colors/fonts — one extracted from the user's website (Settings → Brand kits) carries `sourceUrl` and `screenshots[]` for look-and-feel; otherwise take the look from their site or use tasteful defaults. Keep it genuinely simple — a strong first draft, not a finished site.
 3. Give the user the **`previewUrl`** from the `create_variant` response and tell them it's live — it also appears on their onboarding screen automatically within a few seconds. (Later, for a shareable client/teammate link, use `create_preview_link`; the per-variant previewUrl is for their own eyes.)
 4. Offer the first edit: suggest 2–3 concrete tweaks and let them drive.
 
@@ -232,6 +240,7 @@ Per-platform playbooks and build flows are a **required read** — before creati
 User intent                              → Tool sequence
 ──────────────────────────────────────────────────────────
 (start of EVERY session, before anything)→ list_funnels            (what's live — see "START HERE")
+A tool says "No workspace yet"            → create_workspace        (ask the business name; becomes active)
 "Which workspace am I in?" / agency with → list_workspaces         (every workspace + which is active)
 several client workspaces                  switch_workspace        (by id or name; scopes every later call)
                                            get_brand_kit           (who they are, per domain)

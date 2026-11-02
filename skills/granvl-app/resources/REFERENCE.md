@@ -273,7 +273,18 @@ Two-step direct upload for LOCAL image files: `start_image_upload` returns a sin
 
 #### `list_workspaces` `{}`
 
-Every workspace the signed-in user belongs to (`id`, `name`, `slug`, `role`) plus `activeWorkspaceId`. Read-only.
+Every workspace the signed-in user belongs to (`id`, `name`, `slug`, `role`) plus `activeWorkspaceId`. Read-only. With none: `{ activeWorkspaceId: null, workspaces: [], next }` — `next` points at `create_workspace`.
+
+#### `create_workspace` `{ name, business_type?, website_url?, allow_additional? }`
+
+Onboarding from the agent: creates a workspace owned by the signed-in user — the dashboard's own transaction (OWNER seat, default brand, first-workspace credits) — and makes it the **active workspace for this connection**, so the next call is scoped to it. Call it when a tool answers `No workspace yet. Call create_workspace …` (that exact text is the error every workspace-scoped tool returns while the connection has none).
+
+- `name` — 2–60 characters, usually the business or brand name.
+- `business_type` — `agency` | `business` | `solo`, optional; recorded for the account, not stored in granvl.md.
+- `website_url` — optional (`acme.com` or a full URL); normalized and echoed back for the intake. **No brand kit is extracted** from it.
+- `allow_additional` — default `false`: if the connection already has a workspace it is returned (`created: false`) and nothing is created or counted. `true` creates another (an agency's next client) and switches to it.
+
+Returns `{ workspace_id, name, created, active: true, website_url?, next }`; `next` says what to do: the intake → `update_workspace_context`, then the first page (SKILL.md "Brand-new workspace"). Refused on API-key connections (a key is bound to one workspace) and for accounts pending approval. At most 5 new workspaces per user per day, shared with the dashboard.
 
 #### `switch_workspace` `{ workspace }`
 
@@ -693,7 +704,7 @@ Bakes every page live on the domain (homepage + connected domain required) or ta
 
 #### `get_workspace_context` `{}`
 
-The workspace's `granvl.md` memory document: `{ content, updatedAt, empty }`. Call first every session. `empty: true` → run the intake (SKILL.md "START HERE") and save it with `update_workspace_context`.
+The workspace's `granvl.md` memory document: `{ content, updatedAt, empty }`. Call first every session. `empty: true` → run the intake (SKILL.md "START HERE") and save it with `update_workspace_context`. With no workspace at all it answers `{ workspaceId: null, …, empty: true, next }` (no error) — call `create_workspace` first. `list_funnels` does the same (`{ count: 0, funnels: [], next }`).
 
 #### `update_workspace_context` `{ content }`
 

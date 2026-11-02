@@ -353,7 +353,7 @@ When the user clicks "Ask Claude →" on a Performance Feed card, you receive a 
 5. Draft new variant fixing the issues you found
 6. create_variant({ ..., html_content })
 7. set_weights — split 50/50 with the current variant
-8. publish_funnel({ funnel_id, confirm: true }) — publishing is what activates the new variant (no status field on update_variant)
+8. publish_funnel({ funnel_id }) → show the returned summary, and after the user's yes publish_funnel({ funnel_id, confirmation_token }) — publishing is what activates the new variant (no status field on update_variant)
 9. Reply to user: "Drafted a mobile-fixed variant. Live at 50/50 against v3. I changed: [bulleted list of what you fixed]."
 ```
 

@@ -190,7 +190,9 @@ set_weights({ page_id: "<page>", weights: [
   { variant_id: "<v1 id>", weight: 50 },
   { variant_id: "<v2 id>", weight: 50 },
 ]})
-publish_funnel({ funnel_id: "<funnel>", confirm: true })
+publish_funnel({ funnel_id: "<funnel>" })            // preview: summary + confirmation_token, nothing changes
+// show the summary; after the user says yes:
+publish_funnel({ funnel_id: "<funnel>", confirmation_token: "<token>" })
 ```
 
 ### Step 5 — Reply
@@ -491,7 +493,9 @@ If still `PENDING`, ask the user to wait or check their DNS records.
 The variants are usually still `DRAFT` at this point. There is no activate call — `publish_funnel` bakes the HTML and flips every weighted variant ACTIVE in one step.
 
 ```
-publish_funnel({ funnel_id: "<funnel>", confirm: true })
+publish_funnel({ funnel_id: "<funnel>" })            // preview: summary + confirmation_token, nothing changes
+// show the summary; after the user says yes:
+publish_funnel({ funnel_id: "<funnel>", confirmation_token: "<token>" })
 ```
 
 ### Step 5 — Reply
@@ -1003,13 +1007,14 @@ Granvl does first-party analytics. GTM is allowed (configure per-domain), but in
 
 This works until the user moves the funnel to a different domain. Use `{{THANK_YOU_URL}}` — server substitutes correctly regardless.
 
-### ❌ Calling `delete_variant` on the user's behalf without explicit confirmation
+### ❌ Sending a `confirmation_token` the user never approved
 
 ```
-delete_variant({ variant_id: "...", confirm: true })
+delete_variant({ variant_id: "..." })                                  // returns summary + token
+delete_variant({ variant_id: "...", confirmation_token: "<token>" })   // ❌ same turn, no user yes
 ```
 
-Always require `"yes, delete it"` from the user before providing `confirm: true`. There's no undo and analytics events are gone.
+The first call is the question, not a formality: show its `summary` and wait for an explicit "yes, delete it" before the second call. A hard delete has no undo and its analytics events are gone. (`confirm: true` is deprecated and authorizes nothing.)
 
 ### ❌ `set_weights` without first reading current variants
 

@@ -29,9 +29,9 @@ All tools require Bearer auth via the user's API key. Per-user scoping is enforc
 
 ### Funnels
 
-#### `list_funnels` `{}`
+#### `list_funnels` `{ brand_id?, limit?, cursor? }`
 
-Returns every funnel in the workspace with embedded page + variant counts. **Use first** in any new conversation.
+Returns the workspace's funnels, most recently updated first, with embedded page + variant counts. **Use first** in any new conversation. Paged: `limit` defaults to 100 (max 500); the response carries `next_cursor` — when it isn't `null`, call again with `cursor: next_cursor` (same `brand_id`) for the rest.
 
 #### `get_funnel` `{ funnel_id }`
 
@@ -53,19 +53,33 @@ Pages come back empty (no variants yet) — call `create_variant` next.
 
 #### `update_funnel` `{ funnel_id, name?, platform?, domain_id?, thank_you_view_conversion?, validate_phone_enabled?, validate_email_enabled?, trusted_form_enabled?, goal? }`
 
-Provide `domain_id: null` to disconnect. No `status` arg — `publish_funnel` / `unpublish_funnel` own status. The other args: `thank_you_view_conversion` (count TY-page arrival as a conversion — for third-party iframe-embed forms that redirect to the TY page, see PAGE-BUILDING §2d), `validate_phone_enabled` / `validate_email_enabled` (silent real-number / real-mailbox checks at submit, inline error, no texted code), `trusted_form_enabled` (TrustedForm snippet + `xxTrustedFormCertUrl` field on every lead for TCPA consent proof), `goal` ∈ `LEAD | SALE | BOOKING | null` (the funnel's outcome goal — drives which KPIs dashboards lead with). Qualification rules go through `set_qualification_rule`, not here; the integration phone format (E.164 / 10-digit / etc.) is set in the dashboard funnel **Integrations** tab, not via MCP.
+Provide `domain_id: null` to disconnect. No `status` arg — `publish_funnel` / `unpublish_funnel` own status. The other args: `thank_you_view_conversion` (count TY-page arrival as a conversion — for third-party iframe-embed forms that redirect to the TY page, see PAGE-BUILDING §2d), `validate_phone_enabled` / `validate_email_enabled` (silent real-number / real-mailbox checks at submit, inline error, no texted code), `trusted_form_enabled` (TrustedForm snippet + `xxTrustedFormCertUrl` field on every lead for TCPA consent proof) — a submit is held up to 2 s for the cert, and each lead row records cert present / missing (Lead capture tab flag + banner), `goal` ∈ `LEAD | SALE | BOOKING | null` (the funnel's outcome goal — drives which KPIs dashboards lead with). Qualification rules go through `set_qualification_rule`, not here; the integration phone format (E.164 / 10-digit / etc.) is set in the dashboard funnel **Integrations** tab, not via MCP.
 
-#### `delete_funnel` `{ funnel_id, confirm: true }`
+#### Two-step confirmation (irreversible tools)
 
-Cascades pages, variants, events, journeys, qualifications. **Confirm with the user before providing `confirm: true`.**
+Every delete tool plus `publish_funnel`, `unpublish_funnel`, `publish_website` and `unpublish_website` takes an optional `confirmation_token`. The call **without** one changes nothing and returns:
 
-#### `publish_funnel` `{ funnel_id }`
+```json
+{ "confirmation_required": true, "executed": false, "tool": "delete_funnel",
+  "action": "Delete \"Roof Quiz\"", "summary": "Deletes \"Roof Quiz\" with its 2 pages and 3 variants, and takes it offline at https://roof.example.com immediately. …",
+  "irreversible": false, "details": { … }, "confirmation_token": "gct1.…", "expires_at": "…", "next_step": "…" }
+```
+
+Show `summary` to the user. Only after they explicitly say yes, repeat the call with the **same arguments** plus `confirmation_token` (10 minutes; bound to workspace + tool + arguments). A bad, expired or mismatched token returns a fresh preview with `token_rejected` and changes nothing. `confirm` is deprecated and ignored.
+
+#### `delete_funnel` `{ funnel_id, confirmation_token? }`
+
+Two-step (above). Takes the funnel offline and removes it with its pages and variants. Funnels with meaningful history are archived (analytics kept); the rest go to the deletion bin. The preview's `summary` says which.
+
+#### `publish_funnel` `{ funnel_id, confirmation_token? }`
+
+Two-step: the first call returns the go-live preview (domain, page and variant counts) and a token; publish with the token after the user's yes.
 
 Validates every variant's HTML, auto-fixes mechanical issues (form-action stripping, missing meta tags, etc.), optimizes (Tailwind precompile + image rehost), bakes, and flips the funnel to `ACTIVE`. Returns `{ validation: { autoFixes, warnings }, budgetViolations? }`. Walk warnings via `update_variant` + re-publish. **`budgetViolations[]` is the speed fix-list** — warn-only checks on the baked bytes (HTML ≤150 KB, images ≤300 KB, zero render-blocking externals, inline JS ≤80 KB), each with a ready `fix`; apply them in the same session and re-publish until empty.
 
-#### `unpublish_funnel` `{ funnel_id }`
+#### `unpublish_funnel` `{ funnel_id, confirmation_token? }`
 
-Sets `status: PAUSED`. History preserved.
+Two-step. Sets `status: PAUSED` — every live page 404s at once. History preserved.
 
 #### `create_preview_link` `{ funnel_id }`
 
@@ -93,9 +107,9 @@ Pages with slugs, types, variant counts. Lighter than `get_funnel` when you only
 
 Renames or changes the page type; `qualification_audience` (`qualified | unqualified | null`) retargets a THANK_YOU page's audience routing. Same slug rules as `create_page` (incl. `"/"` for the domain root). **Changing slug breaks any deep links** — confirm with the user if the funnel is published.
 
-#### `delete_page` `{ page_id, confirm: true }`
+#### `delete_page` `{ page_id, confirmation_token? }`
 
-Cascades variants + events for that page.
+Two-step. Cascades variants + events for that page (archived instead when it has meaningful traffic).
 
 ### Variants
 
@@ -103,7 +117,7 @@ Cascades variants + events for that page.
 
 `page_type` ∈ `LANDING | QUIZ | THANK_YOU | MAGNET`. Returns the canonical, contract-perfect HTML skeleton for that page type — guaranteed zero audit warnings and zero publish auto-fixes. **Call this before authoring any new variant** and replace its `REPLACE:` markers with real content, keeping the structure (control-field placement, form shape, `data-step` sections, `<main>`) exactly as given.
 
-#### `create_variant` `{ page_id, name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config? }`
+#### `create_variant` `{ page_id, name, html_content, headline, angle_hypothesis, value_proposition, target_audience, form_factor, weight?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, allow_new_fields? }`
 
 The five attribution fields (`headline` verbatim H1, `angle_hypothesis`, `value_proposition`, `target_audience`, `form_factor`) are **required** — the call rejects without them (see SKILL.md "Variant metadata"). Status defaults to `DRAFT`. `weight` defaults to 50; sums across active variants must reach 100. `embedded_widget` ∈ `calendly | cal_com | hubspot_meetings | acuity | savvycal | tidycal | custom | null` — set it whenever the variant embeds a booking widget (with `custom`, also provide `embedded_widget_config: { originPattern, matcherJs }`); see PAGE-BUILDING §2c.
 
@@ -111,7 +125,9 @@ The five attribution fields (`headline` verbatim H1, `angle_hypothesis`, `value_
 
 Same shape as `create_variant`, batched — including the five required attribution fields **per item**. 1–10 variants per call. Faster than N round-trips when generating a fresh test.
 
-#### `update_variant` `{ variant_id, name?, html_content?, weight?, headline?, angle_hypothesis?, value_proposition?, target_audience?, form_factor?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, change_summary?, acknowledge_stat_pollution? }`
+#### `update_variant` `{ variant_id, name?, html_content?, weight?, headline?, angle_hypothesis?, value_proposition?, target_audience?, form_factor?, headline_type?, cta_type?, angle?, page_style?, embedded_widget?, embedded_widget_config?, change_summary?, acknowledge_stat_pollution?, allow_new_fields? }`
+
+On a funnel whose primary destination is map-driven (LeadProsper, HubSpot, ActiveCampaign, Lead Distro), a write that ADDS a form field the map does not deliver is refused with the unmapped names (existing names are never respelled either). Fix: use the funnel's existing names, or add the mapping first; `allow_new_fields: true` only for a genuinely new question the CRM should not receive yet. `patch_variant_html` takes the same flag.
 
 **When `html_content` differs from the current value**, a new `VariantVersion` row is written automatically with `source: AI_EDITED`. Provide `change_summary` (one-liner like "Tightened headline; swapped CTA color") so the version timeline tells the iteration story, and re-articulate the attribution fields whenever the edit shifts headline / angle / value-prop / form. `acknowledge_stat_pollution: true` is the guardrail escape hatch — only after the USER explicitly consents (see SKILL.md).
 
@@ -123,7 +139,9 @@ Variant fields + preview URL.
 
 **The current HTML.** Use this when the user asks for a small change ("change the headline") — read first, edit, then `update_variant`. Saves regenerating the entire page from scratch and preserves iteration provenance.
 
-#### `delete_variant` `{ variant_id, confirm: true }`
+#### `delete_variant` `{ variant_id, confirmation_token? }`
+
+Two-step.
 
 This archives (soft-deletes): the variant leaves routing but analytics history is preserved. There is no `status` field on `update_variant` — pause with `set_weights` weight=0, archive with `delete_variant`, activate via `publish_funnel`.
 
@@ -137,7 +155,7 @@ Copy a variant (yours or a teammate's) to iterate without disturbing the origina
 
 #### `duplicate_funnel` `{ funnel_id, name?, platform? }`
 
-Clone an entire funnel — all pages + variants — as a DRAFT copy owned by the caller. Keeps the source's domain reference (rename slugs or archive the source before publishing the copy). `platform` overrides the copy's channel (defaults to the source's).
+Clone an entire funnel — all pages + variants, and the whole setup: destinations with field maps and fallbacks, declared form fields, qualification rule, phone / state formats, address autocomplete, validation and TrustedForm toggles, cookie banner, stats settings — as a DRAFT copy owned by the caller. Keeps the source's domain reference (rename slugs or archive the source before publishing the copy). `platform` overrides the copy's channel (defaults to the source's). Nothing to rebuild afterwards; change the form only after the copy has landed, keeping every existing field name.
 
 ### Variant version history
 
@@ -191,7 +209,9 @@ Runs our checks (TXT-ownership at `_granville-verify.<domain>` AND routing CNAME
 
 Returns the exact records to publish (TXT ownership + CNAME/A routing). Pair with `verify_domain` after the user has set them.
 
-#### `update_domain_tracking` `{ domain_id, meta_pixel_id?, ga4_measurement_id?, google_ads_conversion_id?, google_ads_conversion_label?, google_tag_id?, google_ads_tracking_mode?, attribution_consent_mode?, tiktok_pixel_id?, google_tag_manager_id?, microsoft_ads_uet_tag_id?, sms_sender_name? }`
+#### `update_domain_tracking` `{ domain_id, meta_pixel_id?, ga4_measurement_id?, google_ads_conversion_id?, google_ads_conversion_label?, google_tag_id?, google_ads_tracking_mode?, attribution_consent_mode?, trusted_form_default?, tiktok_pixel_id?, google_tag_manager_id?, microsoft_ads_uet_tag_id?, sms_sender_name? }`
+
+`trusted_form_default: true` turns TrustedForm on for EVERY funnel served on the domain (effective = the funnel's `trusted_form_enabled` OR this); use it on lead-selling / TCPA-sensitive domains so no page ships without a cert URL. Read it back with `get_domain → trusted_form_default`. Changing it re-bakes the domain's funnels.
 
 Per-domain ad-platform tracking IDs. Server-side (CAPI / Events API) AND client-side (pixel) are configured together. Provide `null` to clear any field. **Secrets are dashboard-only:** the Meta CAPI access token, GA4 API secret and TikTok Events API token are entered by the user in granvl → Settings → Tracking; the tool rejects them as arguments, and its `configured` summary reports whether each is set.
 
@@ -275,7 +295,7 @@ OWNER/ADMIN only. Sets ADMIN or MEMBER; the owner's role and your own can't be c
 
 #### `set_form_destination` `{ funnel_id, input, replace_all? }`
 
-Paste a vendor URL or embed; the extractor parses + saves. **Non-destructive:** updates the funnel's existing destination of the SAME provider in place, or adds a new one alongside the rest (the funnel fans out to all of them) — destinations of other providers are never touched unless you provide `replace_all: true` (call `get_form_destinations` first and confirm with the user before removing anything you didn't add). Provide empty string to disconnect all. **LeadProsper:** paste the "Get API Specs" curl/JSON sample (carries `lp_campaign_id` + `lp_supplier_id` + `lp_key`); if only the key parses, the response returns `meta.requiresSetup: true` + `meta.missing[]` and asks for the full sample. LeadProsper field names are case-sensitive and `FirstName` + `LastName` are required. A pasted LeadProsper destination has no field map (inputs post under their own names) — for a real map use `set_leadprosper_destination` below.
+Paste a vendor URL or embed; the extractor parses + saves. **Non-destructive:** updates the funnel's existing destination of the SAME provider in place, or adds a new one alongside the rest (the funnel fans out to all of them) — destinations of other providers are never touched unless you provide `replace_all: true` (call `get_form_destinations` first and confirm with the user before removing anything you didn't add). Provide empty string to disconnect all. **Klaviyo** (newsletter / waitlist sign-ups on ecommerce pages): paste the public API key (site id / `company_id`) and the list id, e.g. `company_id=AbC123 list_id=XyZ789` — the page subscribes the profile browser → Klaviyo (client subscriptions API, 202 = delivered); only `email` (plus `first_name` / `last_name` / `phone`) is mapped onto the profile, every other input lands as a profile property. **Lead Distro:** paste the Inbound API Specs curl sample (or the spec URL plus the `x-api-key`); missing pieces come back as `meta.requiresSetup` + `meta.missing[]`; for a field map or test leads use `set_leaddistro_destination`. **LeadProsper:** paste the "Get API Specs" curl/JSON sample (carries `lp_campaign_id` + `lp_supplier_id` + `lp_key`); if only the key parses, the response returns `meta.requiresSetup: true` + `meta.missing[]` and asks for the full sample. LeadProsper field names are case-sensitive and `FirstName` + `LastName` are required. A pasted LeadProsper destination has no field map (inputs post under their own names) — for a real map use `set_leadprosper_destination` below.
 
 #### `list_leadprosper_campaigns` `{ campaign_id? }`
 
@@ -285,15 +305,19 @@ The LeadProsper campaigns the workspace's dev API key can see (Settings → Inte
 
 Full LeadProsper control — the dashboard mapper over MCP. `field_mappings` is the complete map: `[{ lp_field, form_field }]` where `lp_field` is the campaign's exact, case-sensitive field name and `form_field` is a form input name from `get_form_destinations.formFields`, or `static:<value>` for a constant (e.g. `TargetingSource → static:Meta`), or `name:first` / `name:last` to split a single name input. **Idempotent:** updates the funnel's existing LeadProsper destination in place (or `destination_id`), else adds one alongside the others. Mappings to fields the campaign lacks are dropped and returned in `droppedMappings`; required campaign fields you left out come back in `unmappedRequired` — LeadProsper rejects leads until they are mapped, so fix the map before you finish. `FirstName` + `LastName` are always required and must be separate.
 
+#### `set_leaddistro_destination` `{ funnel_id, campaign_id, supplier_id, api_key, test_lead?, field_mappings?, destination_id? }`
+
+Lead Distro AI (leaddistro.ai) — the three values come from the source's **Inbound API Specs** page (`flo_campaign_id`, `flo_supplier_id`, the `x-api-key`). `field_mappings` is optional: `[{ ld_field, form_field, fallback_form_field? }]` with snake_case Lead Distro names (`first_name`, `last_name`, `phone`, `email`, `state`, `zip_code`, custom fields) and `static:<value>` for constants; omit it to pass every input through under its own name. `test_lead: true` delivers test leads (no billing / routing) while you verify — save again with it off before launch. Required fields you left unmapped come back in `unmappedRequired`. **Idempotent:** updates the funnel's existing Lead Distro destination (or `destination_id`), else adds one. The page posts straight to Lead Distro with the key as the `x-api-key` header (their CORS policy allows it); the verdict (ACCEPTED / UNMATCHED / DUPLICATE) is readable and recorded.
+
 #### `update_form_destination` `{ funnel_id, destination_id, enabled?, label?, sort_order?, hidden_fields?, field_map? }`
 
 `field_map` (ActiveCampaign destinations only) replaces the field mapping — `{ "<form input name>": "<AC field name>" }`; AC's field names + `required` flags are in `get_form_destinations` → `meta.acFields`, the current map in `meta.fieldMap`. Copy a mapping between funnels by reusing the source's `meta.fieldMap` unchanged. The response warns when a required AC field is left unmapped. `{}` clears the map.
 
 Edit a saved destination without re-pasting: `enabled: false` pauses delivery but keeps the config (prefer this over deleting); `label` renames it; `sort_order: 0` makes it the primary (the adapter that owns the submit — others are mirrored browser-side), the rest re-sequence; `hidden_fields` replaces the injected hidden inputs (`{ name, value }` static, `{ name, source: 'cookie', cookie_name }`, `{ name, source: 'page', page_property }`). Only the fields you include change.
 
-#### `delete_form_destination` `{ funnel_id, destination_id }`
+#### `delete_form_destination` `{ funnel_id, destination_id, confirmation_token? }`
 
-Remove one destination by id; the others stay. If none remain, forms fall back to the built-in handler and leads are **not delivered anywhere** — warn the user. Confirm before removing anything you didn't add.
+Two-step. Remove one destination by id; the others stay. If none remain, forms fall back to the built-in handler and leads are **not delivered anywhere** — warn the user.
 
 #### `send_test_lead` `{ funnel_id, webhook_url? }`
 
@@ -325,7 +349,7 @@ Trend line — `points[]` of `{ bucket, visitors, conversions, clickThrus, quali
 
 #### `get_workspace_stats` `{ group_by?, range?, start?, end? }`
 
-Portfolio rollup across **all** funnels in the workspace. `group_by: 'funnel'` (default) → one row per funnel; `'platform'` → aggregate by `Funnel.platform` (`GOOGLE_SEARCH`, `META`, … ; `UNSET` for untagged). Each group: `{ key, label, funnelCount, visitors, conversions, clickThrus, qualifiedConversions, convRatePct, qualifiedConvRatePct }`, plus workspace `totals`. Same counting rules as `get_funnel_stats` (groups reconcile with each funnel's own stats). Top 100 groups. This is the tool for "which funnel converts best?" / "Meta vs Google across everything".
+Portfolio rollup across **all** funnels in the workspace. `group_by: 'funnel'` (default) → one row per funnel; `'platform'` → aggregate by `Funnel.platform` (`GOOGLE_SEARCH`, `META`, … ; `UNSET` for untagged). Each group: `{ key, label, funnelCount, visitors, conversions, clickThrus, qualifiedConversions, convRatePct, qualifiedConvRatePct }`, plus workspace `totals` — `funnelsWithTraffic` (funnels with a visitor in the window; `funnels` is the same number, kept for compatibility) and `funnelsTotal` (every live funnel, traffic or not; this is the count `list_brands` reports). Same counting rules as `get_funnel_stats` (groups reconcile with each funnel's own stats). Top 100 groups. This is the tool for "which funnel converts best?" / "Meta vs Google across everything".
 
 #### `get_analytics_events` `{ funnel_id?, variant_id?, type?, utm_source?, device?, range?, start?, end?, limit? }`
 
@@ -388,6 +412,28 @@ Direct upload for LOCAL creative files — the path for any video on disk and fo
 
 **List the workspace's creative bucket** (uploaded images/videos, newest first) + shared storage usage vs quota. Check what exists before asking the user to upload; use it to pick creatives when building campaigns.
 
+### Shopify store (read [SHOPIFY.md](./SHOPIFY.md) first)
+
+#### `get_store_summary` `{ days?, store_id? }`
+
+Daily store numbers for the window and the previous period: revenue (order total − tax, refunds applied), orders, AOV, ad spend (all synced platforms), MER, new-customer orders / share / nCAC, COGS, shipping, payment fees, contribution margin, attributed revenue + coverage, a daily series and a channel split, plus `health` (last webhook / sync, snippet coverage). `days` ∈ 7 | 30 | 90 (default 30). `store_id` only when the workspace has several stores.
+
+#### `get_store_attribution` `{ level?, model?, days?, store_id? }`
+
+Orders / revenue / new-customer orders / spend / contribution per `level` ∈ `channel` (default) | `campaign` | `adset` | `ad` | `page`, under `model` ∈ `lastNonDirect` (default) | `first` | `last`. Spend is joined by the ad ids granvl's URL template carries, falling back to campaign name; `joined: false` rows have no matching spend — report them as unknown, never invent a ROAS. Includes an `unattributed` bucket and `totalOrders` so rows reconcile to the summary.
+
+#### `get_store_products` `{ days?, store_id? }`
+
+Per-product units, orders, revenue, new-customer orders, unit cost and gross margin over the window, with `productUrl` + `imageUrl`. Sorted by revenue.
+
+#### `list_store_products` `{ query?, store_id? }`
+
+The synced catalog (incl. products with no sales): id, title, handle, variants (price / sku / unit cost), `productUrl`, `imageUrl`. The source for Shop-now links on pre-sell pages — use `productUrl` as a PLAIN link; the tracking script appends the ad context + gv_cid at click time.
+
+#### `set_store_costs` `{ store_id?, payment_fee_pct?, payment_fee_fixed?, shipping_cost_per_order?, fallback_cogs_pct? }`
+
+Cost inputs behind contribution margin (defaults 2.9% + $0.30, shipping = what was charged, fallback COGS 0%). Unit costs come from Shopify's Cost per item via the product sync.
+
 ### Auto-testing (creative testing engine)
 
 An **auto-test** is a creative bucket tied to one Meta campaign. Once a day the engine counts never-launched creatives in the bucket and, at or above the threshold, launches them as **PAUSED** ad sets in that campaign (up to 5 creatives per ad set, a flat daily budget per set). The human enables them in Ads Manager. Put creatives for **one angle** in one auto-test — the bucket is the unit of the angle.
@@ -419,6 +465,8 @@ File bucket creatives into the auto-test. Shortcut: `upload_ad_creative` accepts
 
 `update_testing_flow` with `rules_enabled: true` turns on the daily rule run for that auto-test — **only after the user has agreed to the disclaimer**, which you must state plainly: it is experimental; under autopilot it can pause ads and change ad set budgets in their Meta account on its own; outcomes are not guaranteed. Provide `accept_experimental: true` with the same call once they agree. Rules: **kill** (0 conversions and spend ≥ 3× the account's median CPL → pause the ad), **promote** (≥3 conversions at ≤ 0.8× median → scale that ad set +20% in place; winners are never moved or duplicated), **retire** (frequency ≥ 2.5 and CTR down ≥ 30% week over week → pause). With `autopilot: "off"` every verdict is a **proposal**; `"kills"` applies kill/retire on its own; `"full"` applies everything. `list_testing_flows` returns open `proposals`; `decide_testing_flow_action` applies or dismisses one. Every threshold is tunable per auto-test with `update_testing_flow`'s `rule_thresholds` (kill_spend_multiple, kill_fallback_spend, promote_min_conversions, promote_cpl_ratio, retire_frequency, retire_ctr_drop, scale_factor); the response echoes the effective `ruleThresholds`.
 
+**Ceiling mode (ad-set rules).** Set `rule_thresholds.cpl_ceiling` to the user's cost-per-lead ceiling (ask for the number — it is theirs, never assumed) and the three ad-level rules step aside: each **ad set** in the testing campaign is judged against the ceiling over 7 / 14 / 30 days and the set — not a single ad — is **scaled** (≥ `promote_min_conversions` leads in 7 days at or under the ceiling; the budget rises by `scale_factor` at most every `raise_every_days`, default 2), **benched** (a fading winner: under the ceiling over 30 days, over it the last 7 → paused for `bench_days`, default 30) or **switched off** (over the ceiling on both windows after one ceiling's worth of spend). A set with fewer than `untested_impressions` (500) impressions in its first `untested_days` (3) is *untested* and is never switched off. `judge_by` picks what a lead is: `"platform"` (Meta-reported conversions) or `"qualified"` (first-party qualified leads from the qualify webhook / `mark_lead_qualified`). Scaling always waits for a person in the Auto-test drawer; off / bench follow `autopilot` like kills. `get_testing_flow_health { testing_flow_id }` is the weekly review: every set with its numbers and the call the rules make right now (`scale_adset | off_adset | bench_adset | watch | untested | benched`) — read it, walk the user through each set, then decide the open proposals.
+
 #### `write_testing_flow_copy` `{ testing_flow_id }`
 
 Write a batch of ad copy + headlines for the auto-test now (otherwise the engine writes one on its first check when `copy_source` is `generate`). Every line goes through the compliance review; the response lists what was held and why. Spends AI credits.
@@ -427,7 +475,7 @@ Write a batch of ad copy + headlines for the auto-test now (otherwise the engine
 
 The campaign-build tool docs live next to their playbooks — read the matching file before any build:
 
-- **Meta** (`create_meta_campaign`, `create_meta_adset`, `create_meta_ad`, `attach_creatives_to_campaign`, `set_ad_identity`, `list_ad_pixels`, `list_custom_audiences`, `search_ad_interests`, `list_meta_pages`, campaign drafts) → [META-ADS.md](./META-ADS.md)
+- **Meta** (`create_meta_campaign`, `create_meta_adset`, `update_meta_adset_budget`, `create_meta_ad`, `attach_creatives_to_campaign`, `set_ad_identity`, `list_ad_pixels`, `list_custom_audiences`, `search_ad_interests`, `list_meta_pages`, campaign drafts) → [META-ADS.md](./META-ADS.md)
 - **Google** (`create_google_search_campaign`, `create_google_ad_group`, `create_google_search_ad`, `create_google_demand_gen_campaign`, `create_google_demand_gen_ad_group`, `create_google_demand_gen_ad`, `create_google_demand_gen_video_ad`, `search_google_locations`, `set_google_location_targeting`, `create_google_custom_segment`, `list_google_audiences`, `attach_google_audiences`, `generate_keyword_ideas`, `add_google_keywords`, `add_google_negative_keywords`, `get_google_search_terms`, `update_google_campaign`) → [GOOGLE-ADS.md](./GOOGLE-ADS.md)
 - **Microsoft** (`create_microsoft_search_campaign`, `create_microsoft_ad_group`, `create_microsoft_search_ad`, `add_microsoft_keywords`, `add_microsoft_negative_keywords`; keyword planning: `generate_microsoft_keyword_ideas` (live), `get_microsoft_search_terms` + `get_microsoft_keywords` (synced store); B2B LinkedIn targeting: `search_linkedin_companies`, `list_linkedin_profiles`, `set_microsoft_linkedin_targeting` — bid boosts by company/industry/job function) → [MICROSOFT-ADS.md](./MICROSOFT-ADS.md)
 
@@ -439,7 +487,7 @@ A campaign HUB is granvl's grouping layer (dashboard → Campaigns): a named hub
 - `get_campaign_hub` `{ hub_id, range? }` — linked funnels + ad campaigns AND the measurement rollup (7d/30d/90d). The starting point for cross-platform measurement audits.
 - `create_campaign_hub` `{ name, description?, funnel_ids?, ad_campaigns? }` — ad campaign refs are `{ platform, account_id, ad_campaign_id }` from `get_ad_entities` (level campaign).
 - `update_campaign_hub` `{ hub_id, name?, description?, add_funnel_ids?, remove_funnel_ids?, add_ad_campaigns?, remove_ad_campaigns? }` — add/remove semantics, never replace.
-- `delete_campaign_hub` `{ hub_id, confirm: true }` — archives the hub (soft delete, same as the dashboard). Linked funnels and ad campaigns are untouched; only the grouping goes away. **Confirm with the user before providing `confirm: true`.**
+- `delete_campaign_hub` `{ hub_id, confirmation_token? }` — two-step; archives the hub (soft delete, same as the dashboard). Linked funnels and ad campaigns are untouched; only the grouping goes away.
 
 **Offer, don't impose:** after building a funnel and its ad campaigns, OFFER to group them into a hub ("want these grouped under one campaign view?"). Never create a hub as an unrequested side effect.
 
@@ -529,9 +577,9 @@ Returns a deal-close webhook URL bound to the current workspace. Paste into the 
 
 ### Sessions + journeys
 
-#### `list_session_journeys` `{ funnel_id?, funnel_type?, qualified?, converted?, audience_cohort?, closed_only?, limit? }`
+#### `list_session_journeys` `{ funnel_id?, funnel_type?, qualified?, converted?, audience_cohort?, closed_only?, stage?, limit?, cursor? }`
 
-One materialized row per session × funnel. Each row carries:
+One materialized row per session × funnel, newest sessions first (by `startedAt`). Paged: `limit` defaults to 50 (max 500 per page); the response carries `next_cursor` — when it isn't `null`, call again with `cursor: next_cursor` and the **same filters** to walk further back. There's no cap on the total, only on one page. Each row carries:
 
 - **Funnel structure at time of visit**: `funnelType` (`CLICK_THROUGH | SINGLE_LANDING | LEAD_CAPTURE | QUIZ_FUNNEL | FORM_FUNNEL | MULTI_STEP_LEAD | OTHER`), `pageCount`, has{Quiz,Form,ThankYou}, isClickThrough
 - **Path**: `pagePath: pageId[]`, `variantPath: variantId[]` (chronological)
@@ -561,17 +609,269 @@ The workspace's research memory — **call BEFORE proposing or generating any ex
 
 #### `list_optimization_actions` `{ funnel_id?, window_days?, limit? }`
 
-**What the autonomous optimizer DID** — so you can report it + react. When auto-optimize is enabled on a page, a cron silently pauses underperformers, flags the current leader, and generates fresh variants. This returns those as a chronological `actions[]` feed: each has `type` (`paused` | `leader` | `generated`), `variant` / `pageName` / `funnelId` / `funnelName`, an ISO `at`, and a plain-English `detail` (the reason, or "promote it to start testing"); plus `counts` per type. `window_days` default 7. **Call it at the start of a session and when the user asks "what changed / what did you do?"** — narrate it ("overnight I paused X and shipped two new variants; B is leading"); it's the proof the system works _for_ them and tees up your next move. `hasData=false` when nothing autonomous happened (auto-optimize off, or too little traffic).
+**What the autonomous optimizer DID** — so you can report it + react. When auto-optimize is enabled on a page, a cron silently pauses underperformers, flags the current leader, and generates fresh variants. This returns those as a chronological `actions[]` feed: each has `type` (`paused` | `leader` | `generated`), `variant` / `pageName` / `funnelId` / `funnelName`, an ISO `at`, and a plain-English `detail` (the reason, or "promote it to start testing"); plus `counts` per type. `window_days` default 7. **Call it at the start of a session and when the user asks "what changed / what did you do?"** — narrate it ("overnight I paused X and shipped two new variants; B is leading"); it's the proof the system works _for_ them and tees up your next move. `hasData=false` when nothing autonomous happened (auto-optimize off, or too little traffic). **Paused platform-wide since 2026-10-28** (`AUTO_OPTIMIZE_ENABLED` off): the crons no longer pause variants or rotate generated ones in, so this list only shows history until it is switched back on; the winner rules in OPTIMIZATION.md and in code are being reconciled first.
 
 #### `get_optimization_suggestions` `{ funnel_id, range? }`
 
 **Deterministic NEXT MOVES for a funnel — it suggests, you act** (no autonomous edits). Runs the same verdict logic as the auto-optimize cron, per page, as advice: `promote_winner` (a variant cleared the bar — ≥50 sessions, leads >2× a loser), `pause_loser` (under half the leader's rate), `start_test` (a page with real traffic but only one variant in rotation). Each has `type`, `severity`, `pageId`/`pageType`, `variantId`/`variantName`, and a plain-English `title` + `detail` + `suggestedAction` (the exact tool to call). **History-aware:** also returns `history` `{ wins, failures }` from the funnel's past learnings, and `start_test`'s action tells you to avoid re-testing known failures — never repeat a dead end. Use when the user asks "what should I do / optimize?" `hasData=false` (with a `message`) when tests are still gathering data or everything's performing. Pairs with `list_optimization_actions` ("what was done") and `analyze_funnel` (the LLM narrative).
 
+### Research library
+
+Foundation documents are the workspace's written research: one document per brand or offer with `##` sections (Product, Market & competitors, Audience & customer voice, Offer, Beliefs & messaging, Research library). They live in folders, carry tags, a status (`template | draft | approved`), a star, and an `agent_context` flag (documents flagged as agent context are handed to agents as workspace context). Every content write keeps a version the user can restore. Evidence rows (`list_research`) can be filed under a document. **Read the library at the start of research or copy work, and write what you learn back into it** — it is the shared memory between the user, the dashboard and every agent.
+
+#### `list_research_documents` `{ brand_id? }`
+
+Folders (with counts) and documents (title, kind `foundation|supporting`, status, folder, tags, section titles, starred, agent_context, updated_at). No content. Omit `brand_id` for the whole workspace.
+
+#### `get_research_document` `{ document_id, format? }`
+
+One document as markdown plus its section list; a report also returns its structured `report` and `coverage` (`{ quotes, competitors, evidenceSources, sources, level: 'thin' | 'fair' | 'solid', below, autoDeepened }`). A supporting file returns its `file_url` and `file_mime` instead. `format: 'html'` returns `html` instead of markdown: a complete, styled, script-free page. **If your host has a browser pane (Claude Code, Codex): write it to a local `.html` file and open it there** — that is how the user reads a report comfortably; summarise the executive summary in chat alongside. Hosts without a browser read the markdown.
+
+#### `create_research_document` `{ title, folder_id?, tags?, markdown?, brand_id?, file_url?, file_mime? }`
+
+New foundation document — seeded with the template when `markdown` is omitted. With `file_url` (an asset you uploaded to this workspace) it becomes a supporting file instead. Returns `id`, `sections` and the dashboard `url`.
+
+#### `update_research_section` `{ document_id, heading, markdown }`
+
+Replace one `##` section's body (case-insensitive heading; a new heading is appended). The preferred edit: small, versioned, leaves the rest untouched.
+
+#### `replace_research_document` `{ document_id, markdown, summary? }`
+
+Replace the whole body. Versioned. Use only when restructuring the document.
+
+#### `update_research_document` `{ document_id, title?, folder_id?, tags?, starred?, status?, agent_context? }`
+
+Metadata only. `folder_id: null` moves it to the library root. Set `status: "approved"` when the user signs the document off; set `agent_context: true` so agents read it as context.
+
+#### `delete_research_document` `{ document_id }`
+
+Deletes the document; linked evidence rows are kept and unlinked. Ask first.
+
+#### `list_research_document_versions` `{ document_id }` · `restore_research_document_version` `{ document_id, version_id }`
+
+Saved versions (newest first, `source` `human|agent|restore`, `summary`, `created_at`) and roll-back. Restoring saves the current text as a version first.
+
+#### `create_research_folder` `{ name, parent_id?, tags?, brand_id? }` · `update_research_folder` `{ folder_id, name?, parent_id?, tags? }` · `delete_research_folder` `{ folder_id }`
+
+Folders nest. Delete only works on an empty folder.
+
+#### `attach_research_evidence` `{ research_id, document_id }`
+
+File an evidence row under a document (`document_id: null` unlinks). The document's Research library section lists it as a source record (E001…).
+
+### Websites
+
+The brand website (docs: Website tier). A fixed roster — Homepage `/`, Services `/services`, About `/about`, Contact `/contact`, one extra page — plus Privacy `/privacy` and Terms `/terms` that don't count. One website per brand. Every page shares one header, footer, navigation and **main website button**; the bake swaps `{{SITE_HEADER}}` and `{{SITE_FOOTER}}` into each page (put them right after `<body>` and right before `</body>`; they're inserted if missing) and `{{SITE_CTA}}` inside the header fragment becomes the button. Websites are deliberately simple: one version per page (no split tests), no ad attribution, at most one `<form>` and only on Contact (or the extra page), no quiz steps. Landing pages stay funnels — on the same domain, at their own slugs; the website owns `/`.
+
+#### `create_website` `{ name, brand_id?, domain_id? }`
+
+Creates the website with an empty roster and a default header / footer built from the brand kit. Refuses a second website on the same brand. Connect a domain here or later with `update_website` — publishing needs one.
+
+#### `get_website` `{ website_id }` · `list_websites` `{}`
+
+The roster (`role`, `status` `not_created | draft | published | changed`, `previewUrl`, `liveUrl`), the layout (header / footer HTML, `navLinks`, `cta`, `theme`, `searchVisible`), domain and publish state. `pagesCreated` of `pageCap`.
+
+#### `create_website_page` `{ website_id, role, html, name? }` · `update_website_page` `{ website_id, role, html, change_summary? }` · `delete_website_page` `{ website_id, role, confirmation_token? }` (two-step)
+
+Pages by role. `html` is the complete document. A page previews at once; on a published website an update waits for `publish_website` (the dashboard shows "Unpublished changes"). The homepage can't be deleted while the site is live.
+
+#### `set_website_layout` `{ website_id, header_html?, footer_html?, nav_links?, theme?, search_visible? }`
+
+The shared appearance. Omitted fields keep their value. `header_html` should contain `{{SITE_CTA}}` where the main button goes; `footer_html` should link `/privacy` and `/terms`. `search_visible: false` adds `noindex` to every page and disallows the domain in robots.txt.
+
+#### `set_website_button` `{ website_id, label, funnel_id | page_id | url }`
+
+The main button: one target. A funnel target links to that funnel's landing page (relative when it shares the domain) and its clicks count as **Funnel clicks** in the website analytics.
+
+#### `publish_website` `{ website_id, confirmation_token? }` · `unpublish_website` `{ website_id, confirmation_token? }`
+
+Both two-step (preview → user yes → token).
+
+Bakes every page live on the domain (homepage + connected domain required) or takes the whole site offline. `robots.txt` and `sitemap.xml` are served per domain automatically.
+
 ### Workspace
 
-#### `get_skill` `{ skill_id?, since_version? }`
+#### `get_workspace_context` `{}`
 
-Fetch the latest skill bundle for self-update: `version` (content hash) + `files[]` (`{ path, content }`) + install paths. Provide `since_version` for a cheap freshness check (`upToDate: true` omits file bodies). Read-only; default `skill_id: 'granvl-app'`.
+The workspace's `granvl.md` memory document: `{ content, updatedAt, empty }`. Call first every session. `empty: true` → run the intake (SKILL.md "START HERE") and save it with `update_workspace_context`.
+
+#### `update_workspace_context` `{ content }`
+
+Whole-file replace of `granvl.md` (≤64 KB). Read, modify, write the complete document back — never a fragment. Workspace-level context only; per-domain brand specifics go through `update_brand_kit`.
+
+### Marketing capabilities
+
+#### `list_capabilities` `{ kind? }`
+
+Returns `{ balance_credits, allowed_regions, default_image_model, video_models_note, models: [{ id, kind, label, region, approx_credits, note }] }` (`default_image_model` only when `kind` is image or omitted; `video_models_note` only when `kind` is video or omitted). Video models are raw-clip models for `generate_video`: their `note` says so and points video ads at `setup_video` — never present them or their prices as video templates. `kind` ∈ image | video | research. Models outside the workspace's allowed regions (default: all, US + EU + SG) are omitted.
+
+#### `generate_image` `{ brief, model?, reference_asset_ids?, use_product_images?, aspect_ratio?, resolution?, funnel_id? }`
+
+Image models: nano-banana-2.1 (default) and gpt-image-2 (when the user asks for ChatGPT's image model). No others. `model` omitted → nano-banana-2.1; the old ids `nano-banana-2` / `nano-banana` resolve to it; any other id is rejected with an error naming the two.
+
+When `reference_asset_ids` is omitted, the brand kit's product images (`update_brand_kit` `product_image_asset_ids`; the funnel's domain kit when `funnel_id` is set, else the active brand's) are attached as references automatically and come back as `product_reference_asset_ids` — the real product is always the reference, never a description of it. `use_product_images: false` opts out.
+
+Generates one image and stores it as a workspace asset. Returns `{ asset_id, url, width, height, model, region, credits_charged, balance_credits, redactions }`. `resolution` ∈ 512 | 1K | 2K | 4K (default 1K). Up to 14 references, all workspace assets. Errors: an image model other than the two, a region the workspace disallows, not enough credits, provider failure (not charged).
+
+#### `generate_video` `{ model, brief, first_frame_asset_id?, reference_asset_ids?, duration_seconds?, aspect_ratio?, resolution?, audio?, funnel_id? }`
+
+**One raw clip only** (a single Seedance / Veo shot from a text / image prompt). NOT the way to make a video ad: for narration, captions, music and a template look use `setup_video`. Call it only when the user explicitly wants one raw clip. Starts an async video job. Returns `{ job_id, status: 'pending', model, region, estimated_seconds, redactions, next }`. `duration_seconds` 4–30 (model-dependent), `resolution` ∈ 480p | 720p | 1080p, `first_frame_asset_id` makes it image-to-video (wins over references).
+
+#### `poll_video_generation` `{ job_id }`
+
+Returns `{ job_id, status: 'pending' | 'completed' | 'failed', model, region, asset_id?, url?, bytes?, credits_charged?, balance_credits?, error? }`. Idempotent; the clip is stored and charged exactly once whoever asks first (poll, webhook or the 5-minute backstop cron). Jobs pending after 2 hours are written off unchanged.
+
+#### `list_video_styles` `{}`
+
+The video templates (styles) for storyboard videos: `{ styles: [{ id, label, summary, image_model, caption_preset }], caption_presets: [{ id, label, summary, mode }] }` — styles `comic-office`, `comic-bright`, `blueprint`, `clay`; caption presets `pill-orange`, `block-caps-yellow`, `karaoke`, `word-by-word`, `hormozi`. Static. For the guided pick (template, voice, music, captions on a card) call `setup_video` instead.
+
+#### `setup_video` `{ picks?, sample_line? }`
+
+**THE entry point for any video request** ("video", "video ad", "video templates"). The guided start. Renders the template picker: four templates, each a bundle of look + narrator + music bed + caption style (`{ templates: [{ id, label, summary, sample_url, palette, caption_preset, voice: { voice_id, model, name }, music_track_id, music_title }], caption_presets, voices (the ElevenLabs narrators — the wizard offers ElevenLabs only), music, usual, picks, sample_line, default_voice_id }`). The user picks a template and taps **Use template**, which walks the short stepper (look → voice → music → captions → review) with that template's voice, music and captions pre-selected to accept or change; Next between steps, Continue on the review step. Only Continue sends: one plain chat message arrives: `Video setup: Clay look, Brian narrating, Inspiring Piano music, Yellow block caps captions. Ready for the script.` (or `no music`). Map the names back to ids from the setup_video result you already hold (`templates[].id`, `voices[].voice_id` + `model`, `music[].id`, `caption_presets[].id`). Parse it, then go straight to the script questions — never re-ask about the look or voice — and pass the ids to `create_video_storyboard` (`style_id`, `voice.voice_id` + `voice.model`, `music_track_id`, `caption_preset`). `picks` pre-selects what the user already said in chat; `usual` is what the workspace rendered with last time (shown as "your usual", outranks the template default). Call it FIRST for any new video unless the user named a look and a voice themselves. The result's `next` says the card shows the previews; never repeat their URLs as markdown images in chat.
+
+#### `review_video_stills` `{ run_id }` · `approve_video_stills` `{ run_id, approve, style_id?, confirm?, max_credits? }`
+
+The look check, and the one cost confirmation of a video run (render_video draws the first stills without asking). **Every run** pauses in status `review` after its first three stills (poll_video_render returns `status: 'review'` and says so; a run with no more than three beats pauses once with all its stills drawn; nothing more is charged while it waits). Call `review_video_stills` to show them: `{ run_id, status, title, style_id, style_label, aspect, stills: [{ beat_id, line, url }], beats_total, credits_charged, remaining_credits, remaining_parts, estimated_total_credits, suggested_max_credits, max_credits?, switch_credits, templates: [{ id, label, summary, sample_url, look_check_credits }] }`, rendered with **Approve · ~N credits** (N = `remaining_credits`: the remaining stills, motion, voice and render) and **Change the look** (each look shows `look_check_credits`, what redrawing its first stills costs; its button reads **Switch · ~N credits**). The button text is the confirmation: where the host lets the card call tools, the card calls `approve_video_stills { approve: true, confirm: true, max_credits: suggested_max_credits }` (or `{ approve: false, style_id, confirm: true }`) itself, polls `poll_video_render` while it is open (redrawing itself when a switched look pauses for review again) and tells you through model context: "Stills approved for run … (about N more credits approved, max_credits M)", "Stills switched to '…' for run … (about N credits to redraw the first stills)", then "Video run … completed: creative …" or "… failed: …". Don't repeat the call; there is no need to poll alongside the card (it is safe: one advance per run runs at a time). Otherwise the verdict arrives as a chat message naming the call to make ("Approve the look for video run … (approve_video_stills approve: true, confirm: true, max_credits: M — about N more credits)…" or "Switch video run … to the \"Clay\" look (approve_video_stills approve: false, style_id clay, confirm: true …)…"); make that call, then keep polling `poll_video_render`. Semantics: `approve: true` continues — without `confirm: true` it returns `{ needs_confirmation, estimated_credits (the remaining cost), estimated_total_credits, suggested_max_credits, message }` above the 20-credit line; `approve: false, style_id` switches the look and redraws only the first stills without asking (bounded like the first look check, ≤ ~30 credits, returned as `look_check_credits`; the card's **Switch · ~N credits** tap is the confirmation; the check pauses again); `approve: false` alone returns the run to draft. `max_credits` sets the whole-run cap here, as on render_video; an approval whose remaining cost no longer fits the cap is refused with the run still in review.
+
+#### `create_video_storyboard` `{ title, style_id, aspect?, characters?, character_asset_ids?, music_track_id?, music_volume?, beats: [{ id, line, visual, emphasis?, overlay?, pause?, motion? }], cta: { line, button? }, voice?, caption_preset?, motion_model? }`
+
+Saves a storyboard for a "faceless explainer" ad (one AI still per spoken beat, slow push-in, word-timed captions with a highlighted keyword, stat cards, end card). Returns `{ run_id, status: 'draft', beats, estimated_seconds, estimated_credits, suggested_max_credits, look_check, still_prompts: [{ beat_id, prompt, aspect, supplied }], next }`. Quote `estimated_credits` (stills + a 1-credit critic review each, motion clips at the full clip price, voice, render); pass `suggested_max_credits` (ceil(estimate × 1.15)) as `max_credits` on render_video. Nothing is generated. Beats take `still_asset_id` (a workspace image asset) to use a host-rendered still instead of generating one — no image credits; the critic reviews it and reports, never redraws. Rules: 4–24 beats, ≤30 spoken words per beat, <220 words total; `emphasis` phrases must appear in their `line`; `visual` is subject + action + setting only (the style adds the look; no text in images); numbers go in `overlay` so they render sharp. `aspect` ∈ 1:1 (default) | 9:16 | 4:5. `pause` (0–2s) adds silence after a line (a voice break tag). `motion: 'animate'` makes that beat a 5s image-to-video clip from its still (video credits; falls back to the still if the provider refuses) — use on 1–3 hero beats. `caption_preset` overrides the style's default treatment; `motion_model` picks the video model for animated beats (default `seedance-2.5`).
+
+#### `render_video` `{ run_id, confirm?, max_credits?, caption_preset?, skip_look_check? }`
+
+Generates the run: stills (image credits, one per beat, plus the critic), motion clips, the voiceover with word timestamps (voice credits), then the render (render credits). It pauses for the look check after the first stills; the cost is confirmed once, at approve_video_stills. So with the look check on (every run, unless `skip_look_check`), this call never returns `needs_confirmation`: it draws the first three stills without asking (bounded: 3 × the dearest image model plus the critic, about 30 credits with gpt-image-2) and returns the run view in `review` with `look_check_credits` (mention it if useful; no need to ask), `estimated_remaining_credits`, `estimated_total_credits` and `suggested_max_credits`. `skip_look_check: true` (only for a re-render of a look the user already approved; update_video_beat and same-look variants keep the approval themselves) confirms everything that is left in one step instead: above the 20-credit line it returns `{ needs_confirmation, run_id, estimated_credits, estimated_total_credits, suggested_max_credits, look_check, message }` — ask, then call again with `confirm: true` and `max_credits: suggested_max_credits`. The balance must cover the whole run before the first still is drawn. Every still passes a vision critic (text, deformed anatomy, missing subject, wrong character) and is redrawn up to twice with the critique folded into the prompt. `max_credits` is a hard cap on the whole run: pass `suggested_max_credits`, not the bare estimate; a run whose whole estimate is over it is refused up front, and a step that would cross it fails the run with finished work kept (raise it and call again to resume; it also updates while the run waits in review). Re-calling a `failed` run resumes with the finished stills. Every charged step writes a row to the activity log ("Video run "…": 3 stills drawn, 3/9 done (18 credits incl. 3 critic)", "…: motion clip for beat b5 (128 credits)", "…: narration, 9 lines (19 credits)", "…: rendered, 38s (29 credits; 102 in all)", "…: look check approved (~84 credits to go)").
+
+#### `poll_video_render` `{ run_id }`
+
+Each call performs the next slice (the first three stills, then after the look check the remaining stills · motion clips · the voice · submit the render · check the render) and returns `{ run_id, status: 'draft' | 'stills' | 'review' | 'motion' | 'voice' | 'rendering' | 'completed' | 'failed', title, style, aspect, beats, stills_done, stills_redrawn, motion_done, motion_fallback, voice_ready, look_check: 'required' | 'approved', estimated_seconds, credits_charged, max_credits?, output_url?, creative_id?, output_seconds?, error?, next }`. Poll every ~20–30s; on `review` stop polling and call `review_video_stills` (the rest of the cost is confirmed there). On `completed` the mp4 is in the creative bucket as `creative_id` — attach it with `attach_creatives_to_campaign` or `add_creatives_to_testing_flow`. The view also carries `style_label` (the look's name) and `motion_beats` (how many beats animate). One advance runs per run at a time (a Redis lock): a call that finds the run busy — the video card or the look-check card polling it — returns its current state without doing work, so overlapping polls never draw or charge a still twice. On MCP Apps hosts the result renders on the creative card (`ui://granvl/creative-review`, `source: 'storyboard'`): stills / motion / narration counts while it works, polling `poll_video_render` itself every 20s (30s while rendering); “Waiting for the look check” on `review` (no polling); the error and **Retry render** on `failed`; on `completed` a player sized to the aspect with **Download**, **Use as ad creative**, **Make a variant** (create_video_variant) and **Change a beat** (update_video_beat), the last three as chat messages. Don't paste the mp4 URL in chat as a markdown image or link — say it's ready and name the creative id (the `next` hint says so).
+
+#### `list_voices` `{ provider?, gender?, accent? }`
+
+Narrator voices. `provider: 'elevenlabs'` (default) returns a curated eight — four male, four female — plus the workspace's own, for `voice.model` `eleven-v4`; `provider: 'fishaudio'` returns public Fish Audio voices for `fish-drama-3` (directable, preview) / `fish-s2.1-pro`. Each voice carries `provider` and the `model` to pass with it. Bracketed cues inside a beat's `line` ("[warmly]", "[sighs]", "[break]") direct the read on v4 and Fish and are never captioned. Shape: `{ voices: [{ voice_id, name, gender, accent, age, use_case, description, preview_url, source: 'default' | 'workspace' }], default_voice_id }`. Renders as a picker with play buttons on MCP Apps hosts; the user's tap arrives as a chat message naming the voice_id. Pass it as `voice.voice_id` on `create_video_storyboard` or `voice_id` on `create_video_variant`, and save the pick to granvl.md.
+
+#### `list_music_tracks` `{ mood? }`
+
+Background beds: `{ tracks: [{ id, title, mood, summary, bpm, seconds, preview_url }], mood, note }` — always the whole library; `mood` only preselects the picker's chip. Previews are 20-second excerpts streamed from granvl; the full track is only ever mixed into a rendered video and is never downloadable. Pass the id as `music_track_id` (optional `music_volume` 0.05–0.4, default 0.18); the bed ducks under every voice clip and fades out on the end card.
+
+#### `list_caption_presets` `{ run_id?, sample_line?, style_id? }`
+
+The five caption styles: `{ presets: [{ id, label, summary, mode: 'chunk' | 'karaoke' | 'word', max_words, font, size, color, highlight, transform, stroke, position }], sample: { line, emphasis, still_url, aspect, style_id, style_label, palette }, current, run_id }`. Renders as a picker that animates every style over the sample line (with `run_id`: that video's first line and still) so the user watches each one before choosing; the tap arrives as a chat message naming the `caption_preset` id. Pass it as `caption_preset` on `render_video` (works on a draft or a finished run — a finished one goes back to draft and re-renders with every still and voice clip reused, render credits only), or on `create_video_storyboard` / `create_video_variant`. Call it after the storyboard is saved, before `render_video`, unless the user already named a style.
+
+#### `update_video_beat` `{ run_id, beat_id, line?, visual?, emphasis?, overlay?, pause?, motion?, still_asset_id? }`
+
+Edits one beat of a run that is not generating and puts the run back in `draft`. Only what changed is redone on the next `render_video`: a new `visual` redraws that still (and its motion clip), a new `line` re-voices that beat, the rest only re-renders. Returns the run view plus `{ beat_id, will_redraw_still, will_revoice, estimated_credits, suggested_max_credits }` (the cap counts what the run already charged). A run whose look the user approved keeps the approval, so the re-render has no look-check pause. The previous mp4 stays in the creative bucket.
+
+#### `create_video_variant` `{ run_id, title?, style_id?, caption_preset?, cta?, voice_id?, music_track_id?, music_volume?, beats?: [{ id, …beat fields }] }`
+
+A sibling run from an existing one. Beats are matched by id and merged; everything left out is inherited. Any beat whose still / voice / motion comes out identical (same model, prompt, references, line, voice) is reused from the source run — or any other run in the workspace — by content hash and never charged again. Returns the new draft run view plus `{ source_run_id, reusable_stills, reusable_voices, estimated_credits, suggested_max_credits }`. Same style as an approved source: `look_check: 'approved'`, no pause; a new `style_id` gets its own look check. Three hooks on one body: three variants each changing beat `b1`, then `add_creatives_to_testing_flow` with the three `creative_id`s.
+
+#### `list_video_runs` `{ limit? }`
+
+Recent runs in the workspace, same shape as the poll view: `{ runs, next }`. On MCP Apps hosts the card lists them (title, look, length, status) and plays a finished one in the player; the list itself never polls.
+
+#### `delete_video_run` `{ run_id, confirm? }`
+
+Delete a run that never finished (draft, failed, or stills drawn but never rendered) — two-step: without `confirm: true` it only reports what would go. A run that is generating is refused (let it finish); a completed run is refused too — its video is a creative in the library, remove it from the creative bucket instead. Stills already stored as assets stay.
+
+#### `research_competitor_ads` `{ brand? | domain? | query?, live_only?, platform?, format?, limit?, previews?, estimate_only? }`
+
+National, US-oriented: English-language ads, relevance-ranked then longest-running; no country or city filter (search the service, never the place); non-US advertisers dropped by landing domain; duplicate placements collapsed. Call with `estimate_only: true` first — returns `{ estimate_only, mode, target, estimated_credits, balance_credits, coverage, next }` and runs nothing. Then returns `{ target, mode, brand, advertiser_matched? (brand/domain only), coverage, total, duplicates_collapsed, non_us_dropped, links_unusable, saved_new, saved_already, ads: [{ saved_id, id, brand, headline, body, cta, format, platforms, days_running, started, live, landing_page, thumbnail, media, niches }], landing_pages, credits_charged, balance_credits, next }` plus thumbnail image blocks (max 10). Every ad is saved to the workspace (Research → Ads); a re-pull refreshes the row instead of duplicating it. Follow with `save_competitor_insights`.
+
+#### `save_competitor_insights` `{ ads: [{ id, offer?, hook?, angle?, notes? }] }`
+
+`id` is an ad's `saved_id`. Offer and hook are YOUR wording (≤ 300 chars each), never the competitor's copy; `angle` is one of pain-point | aspiration | urgency | value | social-proof | curiosity | authority | comparison. Returns `{ saved, unknown_ids, next }`. Free.
+
+#### `list_competitor_ads` `{ competitor?, platform?, format?, live_only?, starred?, missing_insights?, limit? }`
+
+Returns `{ total, ads: [{ id, competitor, domain, headline, body, cta, format, platforms, days_running, live, landing_page, thumbnail, offer, hook, angle, notes, starred, teardown, pulls, last_seen }], next? }`, longest-running first, scoped to the active brand. Free — check before spending credits on a re-pull.
+
+#### `research_landing_page` `{ url, screenshot?, ad_id?, estimate_only? }`
+
+Returns `{ teardown: { url, final_url, title, meta_description, headline, subheadlines, ctas, form_fields, prices, trust_signals, offer_lines, word_count, rendered_with }, attached_to_saved_ads, has_screenshot, credits_charged, balance_credits, next }` plus a screenshot image block. The teardown is kept on the saved ad given by `ad_id`, else on every saved ad that sends to this page.
+
+#### `start_offer_research` `{ offer?, topic?, mode?, country, city?, vertical?, landing_page_url?, competitor_domains?, questions?, estimate_only? }`
+
+One of `topic` (the niche: "residential roofing") or `offer` (the advertiser's own offer) is required; `mode` is `deep` (default, Parallel ultra) or `standard` (cheaper, shallower). With `estimate_only: true` returns `{ estimate_only: true, started: false, mode, estimated_credits, estimated_credits_breakdown, estimated_minutes, balance_credits, enough_credits, next }` and runs nothing — call this first. Otherwise returns `{ job_id, status: 'pending', mode, topic, estimated_credits, estimated_credits_breakdown, estimated_minutes, quick_read: { answer, citations, credits } | null, balance_credits, next }`.
+
+#### `start_niche_research` `{ topic, mode?, country, city?, vertical?, competitor_domains?, questions?, estimate_only? }`
+
+The same run for a niche with no specific offer; identical returns.
+
+Both start tools also take `if_exists` (`'ask'` default | `'new'`): with a report for the same niche and market under 30 days old they return `{ status: 'existing', started: false, existing: { document_id, document_url, title, snapshot_date, mode, sources, quotes, angles[], breakouts: [{ document_id, title }] }, next }` and run nothing.
+
+#### `start_breakout_research` `{ parent_document_id, focus?: 'offer' | 'angle', offer?, angle?, mode?, questions?, estimate_only? }`
+
+A focused child report of an existing report: `focus: 'offer'` with the offer text, or `focus: 'angle'` with one of the parent's angle titles (an unknown title errors and lists them). Inherits the parent's niche, market, keyword table and ad captures (no pulls, so cheaper), defaults to `mode: 'standard'`, files under the parent (`report.header.focus`, `parentDocumentId`). Returns like start_offer_research plus `breakout: { kind, label, parent_document_id }`.
+
+#### `poll_offer_research` `{ job_id }`
+
+Returns `{ job_id, status: 'pending' | 'completed' | 'failed', mode, report?, markdown?, document_id?, document_url?, evidence?: [{ field, url, title, excerpt }], evidence_filed?, credits_charged?, balance_credits?, error?, elapsed_minutes?, expected_minutes?, check_again_in_seconds?, next? }` (the last four while pending). On completion the twelve-section report is already filed as a research document (`document_url`) with its evidence linked; `report` is the structured report (sections `executiveSummary`, `marketSnapshot`, `keywordOpportunity`, `competitors`, `paidAds`, `customerVoice`, `buyerJourney`, `objections`, `messagingAngles`, `compliance`, `gapsAndNextSteps`, `sources`; citations are `refs` into `sources.sources`) and `markdown` its readable projection. Sections the run could not establish (no keyword data, no ads) say so (`available: false`) rather than guessing.
+
+#### `save_research_evidence` `{ document_id?, items: [{ quote, source_url, platform?, finding?, context?, kind? }] }`
+
+Returns `{ filed, already_had, evidence_ids, document_id }`. One evidence row per item, verbatim quote as body, finding + context as takeaways; idempotent on quote + URL. Free.
+
+#### `deepen_offer_research` `{ job_id? | document_id? | offer, market?, sections?, max_credits? }`
+
+`sections` may mix quote sections (`voice_of_customer`, `objections`, `competitors` — Sonar Pro pinned to Reddit / Trustpilot / Yelp / YouTube, ~2 credits each, only quotes not already in the report come back) and report sections (`more_competitors`, `more_objections`, `compliance` — one Sonar query each; `keywords`, `ads` — re-run granvl's own pulls). Returns `{ offer, market, sections: [{ section, heading, added[], markdown, queries }], report_sections?: [{ section, added, notAdded, credits, note }], total_added, queries_run, skipped_for_budget, credits_charged, balance_credits, report_updated, added_to_report, kept_as_evidence_only, document_id, next }`. For a research report every addition lands in the report itself (versioned; a section past its cap keeps the extras as linked evidence and says so); for a foundation document append each quote section's `markdown` under its `heading` with update_research_section.
+
+#### `campaign_preflight` `{ platform: google | meta | microsoft, landing_page_url, daily_budget_usd, campaign_name?, keywords?, negatives?, bid_strategy?, conversion_tracking_confirmed? }`
+
+Returns `{ platform, campaign_name, daily_budget_usd, estimated_monthly_usd, cap_usd, cap_source, bid_strategy, landing_page, checks: [{ id, label, status: pass | warn | fail, detail }], overall: ready | ready_with_warnings | blocked, next }`. Read-only, free; loads the lander once. Renders as a checklist widget in MCP Apps hosts with a “Build it paused” button.
+
+#### `research_keywords` `{ seeds?, country, city?, language?, landing_page_url?, competitor_domains?, limit?, offset?, estimate_only? }`
+
+Returns `{ market, seeds, keywords: [{ keyword, searchVolume, cpc, competition, competitionIndex, lowTopOfPageBid, highTopOfPageBid, concepts? }], returned, offset, total_rows, with_search_volume, with_cpc, data_source, currency: 'USD', note, credits_charged, balance_credits, next }` — top 300 by volume (CPC-bearing first) unless `limit` / `offset`; rows with no volume omitted. `estimate_only: true` returns `{ estimated_credits, tasks, balance_credits }` and runs nothing. Costs a few credits.
+
+#### `classify_keywords` `{ keywords, vertical?, brand_terms?, competitor_terms? }`
+
+Returns `{ high, mid, low, competitor: [{ keyword, intent, reasons }], standard_negatives, message }`. Free, in-process.
+
+#### `build_keyword_plan` `{ offer, keywords: [{ keyword, search_volume?, cpc?, low_top_of_page_bid?, high_top_of_page_bid?, competition? }], market?, vertical?, brand_terms?, competitor_terms?, save_document? }`
+
+Same `plan` shape as plan_search_campaign, plus `research_document_id` when saved and `next`. Free. Plan shape: `themes: [{ name, service, system, keywords: [{ keyword, intent, matchType, searchVolume, cpc, … }], totalVolume, startingCpcUsd, avgCpcUsd, highTopOfPageUsd }]`, `negatives`, `dropped`, `competitorTerms`, `competitorTermsNotFound`, `structure`, `currency: 'USD'`, `cpcNote`. A theme is one service intent on one system (AC Repair, Furnace Installation…) with every spelling inside; past 8 themes the small ones fold into 'Other buying intent'. startingCpcUsd is the median LOW top-of-page bid (bottom of page one), under avgCpcUsd by design — raise toward highTopOfPageUsd when impression share is low.
+
+#### `plan_search_campaign` `{ offer, country, city?, vertical?, language?, landing_page_url?, competitor_domains?, seeds?, brand_terms?, competitor_terms?, save_document?, estimate_only? }`
+
+Returns `{ plan: { structure: 'stag' | 'campaign_per_theme', structureReason, themes: [{ name, totalVolume, startingCpcUsd, keywords: [{ keyword, matchType: 'EXACT' | 'PHRASE', searchVolume, cpc, intent, reasons }] }], negatives, dropped, competitorTerms, totals }, research_document_id, market, seeds, credits_charged, balance_credits, next }`. Costs a few credits; no confirmation.
+
+#### `triage_search_terms` `{ account_id, campaign_id?, days?, vertical?, brand_terms?, competitor_terms? }`
+
+Returns `{ keep, review, negatives_suggested: [{ searchTerm, costUsd, clicks, conversions, intent, reasons, suggested_match, why }], new_theme_candidates, message }`. Read-only.
+
+#### `list_creative_formats` `{ category?, tone?, awareness?, previews?, limit? }`
+
+**STATIC IMAGE ad formats only** — never present them as video templates (videos: `setup_video` / `list_video_styles`). Returns `{ total, formats: [{ slug, name, category, tones, awareness, default_aspect, summary, has_preview, preview_index }], note, next }` plus preview image blocks in `preview_index` order; `next` repeats the image-only routing and says the gallery card shows the previews (never embed their URLs as markdown images in chat). Free.
+
+> **MCP Apps:** hosts that declare the `io.modelcontextprotocol/ui` extension (Claude, ChatGPT) render these tools as widgets from `structuredContent`, with inline image blocks omitted for them: `list_creative_formats` (gallery), `generate_image` / `upload_image` / `generate_video` / `poll_video_generation` and `poll_video_render` / `list_video_runs` (the creative card — it polls a pending clip or a working run itself, then shows the image or a player), `setup_video` (template picker), `review_video_stills` (look check), `list_voices` / `list_music_tracks` / `list_caption_presets` (pickers), `create_variant` / `duplicate_variant` / `bulk_create_variants` / `get_variant` / `set_weights` (landing-page preview with weight sliders), `plan_search_campaign` / `build_keyword_plan` (keyword plan with switches), `research_competitor_ads` / `list_competitor_ads` (ad cards), `campaign_preflight` (checklist). Taps arrive as chat messages, except where the host lets a card call tools: the image card's Three variations / Try again (`generate_image` with the same model, brief and size, plus the user's note) and Approve (no tool — a note only), and the look check's Approve / Switch (`approve_video_stills`; the button names the cost, so the tap is the confirmation) run from the card and report through model context ("Image approved: …", "Generated 3 variations of …: …", "Regenerated … with note '…': …", "Stills approved for run … (about N more credits approved, max_credits M)", "Stills switched to '…' for run …", "Video run … completed: creative …"). The media is on the card: never repeat an image, preview or mp4 URL in chat. Other hosts get the text and image blocks.
+
+#### `get_creative_format` `{ format }`
+
+Returns `{ slug, name, category, brief, render_notes, tones, awareness, default_aspect, preview_url, next }` plus one preview image block. A static image format; `next` carries the same image-only routing and the no-markdown-image line. Free.
+
+#### `compose_creative_brief` `{ format, offer, angle?, headline?, supporting_text?, audience?, facts?, brand_name?, brand_colors?, brand_voice?, aspect_ratio? , funnel_id?, domain_id?, use_product_images? }`
+
+With product images on the brand kit (`funnel_id` → the funnel's domain kit, `domain_id`, or the active brand's), the prompt gains a PRODUCT section that makes the attached reference the truth for colour, label and shape, and the result carries `reference_asset_ids` — pass them to `generate_image`. Never describe the product's colour or label in `offer` / `angle` when a reference exists; the model follows words over photos.
+
+Returns `{ prompt, aspect_ratio, format, on_image_text, render_here, render_elsewhere }`. Free, in-process.
+
+#### `research_web` `{ query, model?, depth?, domains? }`
+
+Search-grounded answer with citations. Returns `{ answer, citations: [{ url, title? }], model, region, credits_charged, balance_credits, redactions }`. `depth` ∈ low | medium | high. Default model `sonar-pro`.
+
+#### `get_credits` `{}`
+
+The AI pool is the one pool: generate_image / generate_video / the research tools draw from it too.
+
+Credit balances in one read: `sms` (balance / used / granted — one credit per verified code), `validation.email` / `validation.phone` (monthly allowances: included, granted, used, remaining), `ai` (allowance, spent, remaining credits, `resetsAt`, `ok`). `pooledFromAgency: true` means a client workspace drawing on its agency's pool. Top-ups: dashboard → Settings → Billing.
+
+#### `get_skill` `{ skill_id?, since_version?, include?, file? }`
+
+The skill, in three sizes: default (`include: 'index'`) returns `SKILL.md` plus an `index` of `{ path, bytes }`; `file: '<path>'` returns one resource; `include: 'all'` returns every file body (for installing under your `installPaths` entry). `since_version` → `upToDate: true` with no bodies when nothing changed. Read-only; default `skill_id: 'granvl-app'`.
+
+**Tool list size.** `tools/list` is tiered: the core tools always; the ad-platform build and live-read tools once the workspace has an ad account connected (or the MCP URL carries `?tools=all`); staff helpers for staff only. A tool you were not shown still works if you call it by name, so a missing tool is never a reason to stop — it is a reason to ask whether an ad account is connected.
+
+**Lookups.** The main reads (`get_funnel`, `get_funnel_summary`, `get_funnel_stats`, `get_form_destinations`, `get_domain`, `get_brand_kit`, `get_domain_dns_records`) accept an id **or** an exact name (funnels) / hostname (domains); an ambiguous name comes back as an error listing the ids. Writes take ids only.
 
 #### `get_activity_log` `{ limit? }`
 
@@ -611,13 +911,13 @@ Use the same vocabulary across a single user's variants — analytics breakdowns
 
 ## Page type semantics
 
-| Type        | What fires                                                                                                                                                                                                                                                                                                                                                                     | Best for                                                              |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| `LANDING`   | Form-submit listener fires `CONVERSION + action=form_submit` on the source variant at submit time. Internal nav to next page fires `CLICK_THROUGH` (intra-funnel, NOT a conversion).                                                                                                                                                                                           | Main entry pages                                                      |
-| `QUIZ`      | Same as LANDING — form-submit listener fires `CONVERSION + action=form_submit` at the moment the form is submitted.                                                                                                                                                                                                                                                            | Multi-step assessments                                                |
-| `THANK_YOU` | If the visitor arrives via the `_cv` redirect chain AND no client-side fire from the same visitor on the same funnel landed in the last 24h, fires `CONVERSION + action=form_submit + trigger=ty_page_fallback` on the SOURCE variant (deduped fallback). Outbound `data-pages-convert` clicks on TY itself fire `CONVERSION + action=click_through + trigger=outbound_click`. | Post-conversion confirmation + secondary CTAs (book a call, download) |
-| `FORM`      | Same as QUIZ — multi-step variant of "form-handler" pages                                                                                                                                                                                                                                                                                                                      | Multi-step forms (financial application, quiz with branching)         |
-| `MAGNET`    | Nothing — MAGNET pages never count as a funnel step or a conversion, never get a form (validator warns `magnet_has_form`), and don't change click-through derivation.                                                                                                                                                                                                           | Post-conversion lead-magnet content (guide, checklist, video page) linked from the TY page |
+| Type        | What fires                                                                                                                                                                                                                                                                                                                                                                     | Best for                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `LANDING`   | Form-submit listener fires `CONVERSION + action=form_submit` on the source variant at submit time. Internal nav to next page fires `CLICK_THROUGH` (intra-funnel, NOT a conversion).                                                                                                                                                                                           | Main entry pages                                                                           |
+| `QUIZ`      | Same as LANDING — form-submit listener fires `CONVERSION + action=form_submit` at the moment the form is submitted.                                                                                                                                                                                                                                                            | Multi-step assessments                                                                     |
+| `THANK_YOU` | If the visitor arrives via the `_cv` redirect chain AND no client-side fire from the same visitor on the same funnel landed in the last 24h, fires `CONVERSION + action=form_submit + trigger=ty_page_fallback` on the SOURCE variant (deduped fallback). Outbound `data-pages-convert` clicks on TY itself fire `CONVERSION + action=click_through + trigger=outbound_click`. | Post-conversion confirmation + secondary CTAs (book a call, download)                      |
+| `FORM`      | Same as QUIZ — multi-step variant of "form-handler" pages                                                                                                                                                                                                                                                                                                                      | Multi-step forms (financial application, quiz with branching)                              |
+| `MAGNET`    | Nothing — MAGNET pages never count as a funnel step or a conversion, never get a form (validator warns `magnet_has_form`), and don't change click-through derivation.                                                                                                                                                                                                          | Post-conversion lead-magnet content (guide, checklist, video page) linked from the TY page |
 
 **Critical: pages do NOT auto-convert on view.** Conversion attribution is `_cv`-driven (see [Runtime page-serving](#runtime-page-serving-behavior)). Old documentation that says "QUIZ/THANK_YOU auto-convert on view" is wrong — the source variant gets the conversion when the visitor arrives at the destination.
 
@@ -687,16 +987,16 @@ For vendor-destination forms (HubSpot/GHL/etc.), the visitor's browser POSTs dir
 
 All conversions are `type=CONVERSION` rows with `conversionAction` set to `form_submit`, `click_through`, or `embedded_widget`. The `metadata.trigger` is forensic provenance only — never query on it.
 
-| Visitor flow                     | Page type pattern                          | What fires (action / trigger)                                                                                                                                                                                                                       | What you write in HTML                                                                                                                                                                                                                                                                         |
-| -------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lead-gen form → thank-you        | LANDING + THANK_YOU                        | `CONVERSION + action=form_submit` on LANDING source variant. Fires client-side at submit (`trigger=client_listener`); TY-page chain re-fires (`trigger=ty_page_fallback`) and gets deduped against the listener fire                                | Form on LANDING with no action/method, hidden `_next={{THANK_YOU_URL}}`                                                                                                                                                                                                                        |
-| Quiz funnel                      | LANDING + QUIZ + THANK_YOU                 | `CLICK_THROUGH` on LANDING when visitor goes to QUIZ (intra-funnel nav, NOT a conversion); `CONVERSION + action=form_submit` on QUIZ when the form is submitted                                                                                     | Form on QUIZ with `_next={{THANK_YOU_URL}}`                                                                                                                                                                                                                                                    |
-| Multi-step form                  | LANDING + FORM + THANK_YOU                 | `CLICK_THROUGH` on each upstream nav; `CONVERSION + action=form_submit` on the page hosting the final form when submitted                                                                                                                           | Each form's `_next` points at the next step's URL                                                                                                                                                                                                                                              |
-| Click-out to external            | LANDING only                               | `CONVERSION + action=click_through + trigger=outbound_click` on the page where the click happened                                                                                                                                                   | `<a href="..." data-pages-convert>...</a>`                                                                                                                                                                                                                                                     |
-| Single-page click-through funnel | LANDING only (with `isClickThrough: true`) | The outbound click IS the conversion (`action=click_through`)                                                                                                                                                                                       | All external `<a>` are auto-tagged `data-pages-convert`. **Create with `create_funnel({ funnel_type: "click_through" })`** — that single arg sets `isClickThrough: true` AND skips the auto-generated thank-you page. Don't use `funnel_type: "standard"` then delete the thank-you afterward. |
-| Post-conversion outbound on TY   | LANDING + THANK_YOU + outbound CTA         | `CONVERSION + action=form_submit` on LANDING (from the form-submit listener) AND a separate `CONVERSION + action=click_through + trigger=outbound_click` on THANK_YOU (post-arrival outbound). Action-keyed dedup keeps these as two distinct rows. | TY page with `<a href="..." data-pages-convert>`                                                                                                                                                                                                                                               |
-| Booking inside an embedded widget (Calendly / Cal.com / HubSpot / Acuity / SavvyCal / TidyCal / custom) | Any page hosting the embed | `CONVERSION + action=embedded_widget + metadata.provider=<provider>` on the hosting page's variant, via the auto-injected postMessage listener. Only fires when the variant has `embedded_widget` set. Dedupes independently of the other actions. | Embed the widget normally in the HTML; provide `embedded_widget` (+ `embedded_widget_config` for `custom`) on `create_variant` / `update_variant` — see PAGE-BUILDING §2c |
-| Custom event (video, scroll)     | Any                                        | `window.pagesTrack('CUSTOM', { metadata })`                                                                                                                                                                                                         | Inline script                                                                                                                                                                                                                                                                                  |
+| Visitor flow                                                                                            | Page type pattern                          | What fires (action / trigger)                                                                                                                                                                                                                       | What you write in HTML                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lead-gen form → thank-you                                                                               | LANDING + THANK_YOU                        | `CONVERSION + action=form_submit` on LANDING source variant. Fires client-side at submit (`trigger=client_listener`); TY-page chain re-fires (`trigger=ty_page_fallback`) and gets deduped against the listener fire                                | Form on LANDING with no action/method, hidden `_next={{THANK_YOU_URL}}`                                                                                                                                                                                                                        |
+| Quiz funnel                                                                                             | LANDING + QUIZ + THANK_YOU                 | `CLICK_THROUGH` on LANDING when visitor goes to QUIZ (intra-funnel nav, NOT a conversion); `CONVERSION + action=form_submit` on QUIZ when the form is submitted                                                                                     | Form on QUIZ with `_next={{THANK_YOU_URL}}`                                                                                                                                                                                                                                                    |
+| Multi-step form                                                                                         | LANDING + FORM + THANK_YOU                 | `CLICK_THROUGH` on each upstream nav; `CONVERSION + action=form_submit` on the page hosting the final form when submitted                                                                                                                           | Each form's `_next` points at the next step's URL                                                                                                                                                                                                                                              |
+| Click-out to external                                                                                   | LANDING only                               | `CONVERSION + action=click_through + trigger=outbound_click` on the page where the click happened                                                                                                                                                   | `<a href="..." data-pages-convert>...</a>`                                                                                                                                                                                                                                                     |
+| Single-page click-through funnel                                                                        | LANDING only (with `isClickThrough: true`) | The outbound click IS the conversion (`action=click_through`)                                                                                                                                                                                       | All external `<a>` are auto-tagged `data-pages-convert`. **Create with `create_funnel({ funnel_type: "click_through" })`** — that single arg sets `isClickThrough: true` AND skips the auto-generated thank-you page. Don't use `funnel_type: "standard"` then delete the thank-you afterward. |
+| Post-conversion outbound on TY                                                                          | LANDING + THANK_YOU + outbound CTA         | `CONVERSION + action=form_submit` on LANDING (from the form-submit listener) AND a separate `CONVERSION + action=click_through + trigger=outbound_click` on THANK_YOU (post-arrival outbound). Action-keyed dedup keeps these as two distinct rows. | TY page with `<a href="..." data-pages-convert>`                                                                                                                                                                                                                                               |
+| Booking inside an embedded widget (Calendly / Cal.com / HubSpot / Acuity / SavvyCal / TidyCal / custom) | Any page hosting the embed                 | `CONVERSION + action=embedded_widget + metadata.provider=<provider>` on the hosting page's variant, via the auto-injected postMessage listener. Only fires when the variant has `embedded_widget` set. Dedupes independently of the other actions.  | Embed the widget normally in the HTML; provide `embedded_widget` (+ `embedded_widget_config` for `custom`) on `create_variant` / `update_variant` — see PAGE-BUILDING §2c                                                                                                                      |
+| Custom event (video, scroll)                                                                            | Any                                        | `window.pagesTrack('CUSTOM', { metadata })`                                                                                                                                                                                                         | Inline script                                                                                                                                                                                                                                                                                  |
 
 Optional metadata on `data-pages-convert`:
 
@@ -756,19 +1056,24 @@ Content-Type: application/json
 
 {
   "lead_id": "8c1e…",            // granville_lead_id from the payload (or "session_id": "ses_abc123")
-  "qualified": true,
+  "stage": "Appointment Booked",  // the CRM's OWN pipeline stage name, sent on every pipeline move
+  "qualified": true,              // optional once `stage` is sent
   "value": 12000,
   "reason": "Closed-Won — Q4 enterprise plan"
 }
 ```
 
-`get_qualify_webhook_url()` returns the workspace URL (bound to this workspace) plus setup instructions — once, on the call that creates it; afterwards `url` is null and the user rotates it from the dashboard. Never construct this URL by hand.
+`get_qualify_webhook_url({ domain_id })` returns the DOMAIN's own postback URL (one per client CRM, scoped to that domain's funnels, rotateable from Settings → Domains → Manage → CRM Quality); without `domain_id` it returns the workspace fallback URL for funnels with no domain — bound to this workspace and returned ONCE, on the call that creates it (later calls give `url: null`; the user rotates it from the dashboard). Never construct this URL by hand.
+
+**Stages (post-submit outcomes).** Two quality signals live on a lead and the dashboard keeps them apart: **fit** (the `qualified` boolean — rule at submit, CRM, or manual) and **outcome** (the furthest CRM stage reached). The CRM sends its own pipeline stage NAME in `stage`; granvl maps it per **domain** to one of ten canonical stages — progress, in order: `CONTACTED → CONVERSATION → BOOKED → NO_SHOW → HELD → QUOTED → WON`; end states: `BAD_CONTACT`, `NOT_FIT`, `LOST`. Common names ("Appt Set", "Showed", "Closed Won", "No Show") map automatically; anything else lands **unmapped** and does not count until mapped — read the map with `get_domain → crm_stages` (unmapped = `stage: null, ignored: false`) and fix it with `set_domain_crm_stages(domain_id, entries: [{ raw_name, stage | ignored }])`, which also re-counts past leads. Stages only move forward (a later "Contacted" after "Booked" is kept in history but does not regress the lead; Won reopens a Lost deal). Conversation and beyond imply `qualified: true`; Bad contact / Not a fit imply `false`. A boolean-only post keeps working and never invents a stage.
 
 ### Stats integration
 
 `get_funnel_stats` and `get_variant_stats` include `qualifiedConversions` + `qualifiedConvRatePct` per variant. The funnel's `statsDisplayMode` (`TOTAL | QUALIFIED | BOTH`) tells you which flavor the dashboard renders.
 
-**When deciding winners**: if the funnel has a qualification rule or webhook updates, prefer `qualifiedConvRatePct` over raw `convRatePct`. Variants that produce more _qualified_ leads are the variants you actually want to scale.
+Each variant also carries `stages: { crmReported, fit, reached: { BOOKED, HELD, WON, LOST, … } }` (reached-or-beyond counts, exact for end states) and the funnel carries `stages: { hasCrmData, stagesSeen, leadingMetric, leadingMetricIsAuto, availableLeadingMetrics, totals }`. `leadingMetric` is what the funnel page calls "leading" — `CONVERSION` by default, `FIT` once a rule exists, `BOOKED` once CRM stages arrive, `WON` once a Won arrives, unless one was chosen explicitly (`update_funnel({ leading_metric })`, `null` = back to automatic). Per-lead outcomes: `list_session_journeys({ stage: 'BOOKED' | 'any' | 'none' })` — rows carry `stage`, `stageLabel`, `rawStage`, `stageAt`, `dealValue`, `outcomeReason`.
+
+**When deciding winners**: compare variants on the funnel's `leadingMetric` and say which one you used — booked ÷ visitors beats fit ÷ visitors beats raw conversion rate, and never mix two in one sentence. Fit and outcome can disagree per variant: a high fit rate with a low booked rate means the **rule** is wrong, not the variant — point the user at the qualification rule. Unreported leads are not lost; `crmReported` is the coverage denominator.
 
 ---
 
@@ -1143,38 +1448,39 @@ Drop this script and the `<span class="gv-error">` pattern on every field. Error
 
 When MCP tools fail, surface the error verbatim — the user often needs the literal validation message.
 
-| Error message                                                                        | Meaning                                                                                                                                                                                                                    | Fix                                                                    |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `Funnel not found`                                                                   | Wrong ID, or funnel belongs to another user                                                                                                                                                                                | `list_funnels`                                                         |
-| `Page not found`                                                                     | Page ID invalid OR not in the user's workspace                                                                                                                                                                             | `get_funnel` for the right page_id                                     |
-| `Variant not found`                                                                  | Variant ID invalid OR not in the user's workspace                                                                                                                                                                          | `get_funnel`                                                           |
-| `Domain "X" is already registered`                                                   | Someone (or you, in another account) registered it first                                                                                                                                                                   | Different hostname                                                     |
-| `Slug "X" already exists in this funnel`                                             | Page slug collision within a single funnel                                                                                                                                                                                 | Different slug                                                         |
+| Error message                                                                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Fix                                                                                                              |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `Funnel not found`                                                                   | Wrong ID, or funnel belongs to another user                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `list_funnels`                                                                                                   |
+| `Page not found`                                                                     | Page ID invalid OR not in the user's workspace                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `get_funnel` for the right page_id                                                                               |
+| `Variant not found`                                                                  | Variant ID invalid OR not in the user's workspace                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `get_funnel`                                                                                                     |
+| `Domain "X" is already registered`                                                   | Someone (or you, in another account) registered it first                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Different hostname                                                                                               |
+| `Slug "X" already exists in this funnel`                                             | Page slug collision within a single funnel                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Different slug                                                                                                   |
 | `The URL "/X" is already used by another funnel ("Y") on this domain`                | Page slugs — the root `/` included — must be unique across all **live** funnels on the same domain (only a published, unarchived page claims its slug — unpublishing or archiving releases the URL). This is NOT a "one funnel per domain" rule — many funnels can share a domain, they just can't share slugs. Raised at the moment of the change (`create_page`, `update_page`, attaching a domain via `update_funnel`), not at publish. Also `Cannot connect this domain: "/X" (used by "Y") is already live on it` when attaching a domain. | Pick a different slug, move the conflicting page to a sub-path, or archive/unpublish the funnel holding the slug |
-| `Weights must sum to 100 (got N)`                                                    | `set_weights` math is wrong                                                                                                                                                                                                | Adjust weights                                                         |
-| `Must specify weights for all N variants`                                            | Partial weights update                                                                                                                                                                                                     | Provide every variant's weight                                            |
-| `Variant X does not belong to this page`                                             | Mixed page IDs in `set_weights`                                                                                                                                                                                            | Re-fetch with `get_funnel`                                             |
-| `Deletion not confirmed. Set confirm=true to delete.`                                | Safety stub                                                                                                                                                                                                                | Confirm with the user, then call again with `confirm: true`            |
-| `Invalid rule shape: <reason>. Expected { type: 'all'\|'any', conditions: [{...}] }` | `set_qualification_rule` rule didn't parse — the reason names the exact path (e.g. `children[1].conditions[0].op="startsWith"`)                                                                                            | See [Lead qualification](#lead-qualification) for flat + nested shapes |
-| `Invalid ts format — expected ISO 8601`                                              | `get_variant_html_at_time` got bad timestamp                                                                                                                                                                               | Use ISO format e.g. `2026-05-04T11:55:00Z`                             |
-| `Invalid token` (qualify webhook)                                                    | Wrong `userToken` in the URL                                                                                                                                                                                               | Call `get_qualify_webhook_url` for the current URL                     |
-| `Internal server error`                                                              | Caught at the top-level handler                                                                                                                                                                                            | Retry once; if persistent, ask user to check `/dashboard/mcp`          |
-| `authorization required` / "granvl tools are unavailable" at client startup | The client's stored sign-in for granvl is stale or predates the current auth setup. Not a granvl outage. | Tell the user to sign in to granvl again from their client's MCP / connector settings, then start a new thread. |
-| Client reports the granvl server timed out at startup | A cold start plus the full tool list can exceed a tight client startup budget. | Retry; if the client exposes a startup-timeout setting, the user can raise it there. |
+| `Weights must sum to 100 (got N)`                                                    | `set_weights` math is wrong                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Adjust weights                                                                                                   |
+| `Must specify weights for all N variants`                                            | Partial weights update                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Provide every variant's weight                                                                                   |
+| `Variant X does not belong to this page`                                             | Mixed page IDs in `set_weights`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Re-fetch with `get_funnel`                                                                                       |
+| `confirmation_required: true` (not an error)                                         | First half of the two-step contract for deletes / publish / unpublish — nothing changed                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Show `summary`; after the user's yes, repeat with `confirmation_token`                                           |
+| `token_rejected`                                                                     | Token expired (10 min), edited, or issued for different arguments / tool / workspace                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Re-confirm the fresh `summary` with the user and use the new token                                               |
+| `Invalid rule shape: <reason>. Expected { type: 'all'\|'any', conditions: [{...}] }` | `set_qualification_rule` rule didn't parse — the reason names the exact path (e.g. `children[1].conditions[0].op="startsWith"`)                                                                                                                                                                                                                                                                                                                                                                                                                 | See [Lead qualification](#lead-qualification) for flat + nested shapes                                           |
+| `Invalid ts format — expected ISO 8601`                                              | `get_variant_html_at_time` got bad timestamp                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Use ISO format e.g. `2026-05-04T11:55:00Z`                                                                       |
+| `Invalid token` (qualify webhook)                                                    | Wrong `userToken` in the URL                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Call `get_qualify_webhook_url` for the current URL                                                               |
+| `Internal server error`                                                              | Caught at the top-level handler                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Retry once; if persistent, ask user to check `/dashboard/mcp`                                                    |
+| `authorization required` / "granvl tools are unavailable" at client startup          | The client's stored sign-in for granvl is stale or predates the current auth setup. Not a granvl outage.                                                                                                                                                                                                                                                                                                                                                                                                                                        | Tell the user to sign in to granvl again from their client's MCP / connector settings, then start a new thread.  |
+| Client reports the granvl server timed out at startup                                | A cold start plus the full tool list can exceed a tight client startup budget.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Retry; if the client exposes a startup-timeout setting, the user can raise it there.                             |
 
 ---
 
 ## Glossary
 
-| Term                          | Meaning                                                                                                                                 |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sticky variant assignment** | `pages_variant_<pageId>` cookie pins the visitor to their variant for ~30 days. Prevents flicker.                                       |
-| **Preview token**             | 128-bit random token per variant; serves the variant's HTML without auth, for QA. In `previewUrl`.                                      |
-| **`{{THANK_YOU_URL}}`**       | Server-side template token. Substituted with the funnel's TY URL on the active domain.                                                  |
-| **`_cv` query param**         | Conversion-source-variant. Auto-threaded through internal links + form-submit redirects. The mechanism conversions attribute by.        |
-| **Honeypot**                  | Hidden form field bots fill but humans don't. Granvl checks `_gotcha`, `website`, `url`, `homepage`, `phone_number_2`.                  |
-| **Click ID**                  | Platform-specific ID added to ad URLs by the ad network (gclid, fbclid, etc.). Used for server-side attribution + CAPI matching.        |
+| Term                          | Meaning                                                                                                                                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Sticky variant assignment** | `pages_variant_<pageId>` cookie pins the visitor to their variant for ~30 days. Prevents flicker.                                                                                                                        |
+| **Preview token**             | 128-bit random token per variant; serves the variant's HTML without auth, for QA. In `previewUrl`.                                                                                                                       |
+| **`{{THANK_YOU_URL}}`**       | Server-side template token. Substituted with the funnel's TY URL on the active domain.                                                                                                                                   |
+| **`_cv` query param**         | Conversion-source-variant. Auto-threaded through internal links + form-submit redirects. The mechanism conversions attribute by.                                                                                         |
+| **Honeypot**                  | Hidden form field bots fill but humans don't. Granvl checks `_gotcha`, `website`, `url`, `homepage`, `phone_number_2`.                                                                                                   |
+| **Click ID**                  | Platform-specific ID added to ad URLs by the ad network (gclid, fbclid, etc.). Used for server-side attribution + CAPI matching.                                                                                         |
 | **`granville_lead_id`**       | Stamped on every vendor-destination submission with `granville_variant_id` / `granville_funnel_id`: the lead's unique id (same as the Lead capture tab), the variant, the funnel. Echo `lead_id` to the qualify webhook. |
-| **`ip_address`**              | The visitor's IP, stamped on every vendor-destination submission (fetched from `/api/ip` on the funnel's domain). Map it to LeadProsper's `ip_address` or any CRM field; never stored by granvl.                        |
-| **Audience cohort**           | Derived label `{device}_{trafficSource}` — e.g. `mobile_paid_meta`, `desktop_organic_search`. Bots/agents are excluded (return `null`). |
-| **AiActivity**                | The user-facing log of every successful MCP tool call. Surfaces in `/dashboard` "Claude Activity" panel.                                |
+| **`ip_address`**              | The visitor's IP, stamped on every vendor-destination submission (fetched from `/api/ip` on the funnel's domain). Map it to LeadProsper's `ip_address` or any CRM field; never stored by granvl.                         |
+| **Audience cohort**           | Derived label `{device}_{trafficSource}` — e.g. `mobile_paid_meta`, `desktop_organic_search`. Bots/agents are excluded (return `null`).                                                                                  |
+| **AiActivity**                | The user-facing log of every successful MCP tool call. Surfaces in `/dashboard` "Claude Activity" panel.                                                                                                                 |

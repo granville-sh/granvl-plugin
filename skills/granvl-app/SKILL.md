@@ -9,12 +9,26 @@ You are operating against an **AI-native landing page platform**. The user has c
 
 **Read this skill before generating page HTML or calling any MCP tool.** The platform has specific runtime conventions: forms are auto-rewritten at serve time, tracking is auto-injected, certain template tokens are substituted server-side, and per-funnel tracking secrets (CAPI, GA4) are kept off the client. If you ignore these, the pages still serve but tracking, A/B routing, conversion attribution, or auto-optimization will silently break.
 
+## Your tool list is tiered — a missing tool is a signal, not a dead end
+
+`tools/list` does not show every tool. What you see depends on the workspace:
+
+- **Core tools** (funnels, pages, variants, domains, brand kit, delivery, stats, learnings, workspace context, credits) — always listed.
+- **Ad-platform tools** (`create_meta_campaign`, `create_google_search_campaign`, `create_microsoft_search_campaign`, keyword / audience / location lookups, creatives, testing flows) — listed once the workspace has an ad account connected on the dashboard's Ads page, or when the MCP URL carries `?tools=all`.
+- **Staff helpers** — staff only; you will never need them.
+
+So: if the user asks for a Meta / Google / Microsoft campaign and you do not see those tools, **do not say granvl can't do it**. Step zero is connecting the ad account (Settings → Ads, or the Ads page) — tell the user that, then reconnect / refresh the tool list. A tool you were not shown still runs if you call it by name, so calling `create_meta_campaign` on a workspace that just connected works even before the list refreshes. `get_ad_data_status` tells you which platforms are connected.
+
+The skill itself is the same shape: `get_skill` returns SKILL.md plus an index of resource files; fetch a resource with `get_skill({ file: 'resources/META-ADS.md' })` the moment a task needs it.
+
+---
+
 ## HARD RULE — MCP tools only. Never drive the dashboard UI.
 
-**Never use computer use, browser automation, or GUI clicking to create, edit, configure, or delete ANYTHING in Granvl.** Not funnels, pages, variants, traffic weights, domains, form destinations, tracking settings, campaigns, API keys, or workspace settings — **every write goes through the Granvl MCP tools** (or the documented HTTP API with an API key). The dashboard is the *user's* surface. Agent-driven clicks bypass the platform's validation, guardrails, HTML bake pipeline, and audit trail, and can silently corrupt state the tools would have protected.
+**Never use computer use, browser automation, or GUI clicking to create, edit, configure, or delete ANYTHING in Granvl.** Not funnels, pages, variants, traffic weights, domains, form destinations, tracking settings, campaigns, API keys, or workspace settings — **every write goes through the Granvl MCP tools** (or the documented HTTP API with an API key). The dashboard is the _user's_ surface. Agent-driven clicks bypass the platform's validation, guardrails, HTML bake pipeline, and audit trail, and can silently corrupt state the tools would have protected.
 
 - A task seems to need the UI? It doesn't — find the MCP tool (decision tree below, or `resources/REFERENCE.md`). If no tool exists for it, **say so and let the user do it in the dashboard themselves.** Never click it into existence.
-- **Sole exception — explicit visual testing.** If the user *explicitly asks* you to test or verify something in a browser ("run through the quiz with the browser", "check how it renders on mobile"), you may open pages, look, and submit *test* data as instructed. Even then it is **read-and-test only**: never change a setting, never create or edit anything through the UI, and return to MCP for any fix the test reveals.
+- **Sole exception — explicit visual testing.** If the user _explicitly asks_ you to test or verify something in a browser ("run through the quiz with the browser", "check how it renders on mobile"), you may open pages, look, and submit _test_ data as instructed. Even then it is **read-and-test only**: never change a setting, never create or edit anything through the UI, and return to MCP for any fix the test reveals.
 
 This file holds the rules that always apply. Task-specific depth lives in resource files, and reading the right one is a **required step**, not optional background:
 
@@ -22,6 +36,7 @@ This file holds the rules that always apply. Task-specific depth lives in resour
 - **Before any Meta campaign work** → STOP and read [resources/META-ADS.md](./resources/META-ADS.md).
 - **Before any Google Ads work (Search or Demand Gen)** → STOP and read [resources/GOOGLE-ADS.md](./resources/GOOGLE-ADS.md).
 - **Before any Microsoft Ads work** → STOP and read [resources/MICROSOFT-ADS.md](./resources/MICROSOFT-ADS.md).
+- **Before any work for a Shopify / ecommerce customer** (pre-sell pages that click out to a store, store revenue / margin / attribution questions) → STOP and read [resources/SHOPIFY.md](./resources/SHOPIFY.md).
 - **Before deep tool-arg / schema / error questions** → read [resources/REFERENCE.md](./resources/REFERENCE.md).
 - **Before customer/ICP/offer research or writing copy** → read [resources/COPYWRITING.md](./resources/COPYWRITING.md). Use the bounded strategy/copy brief tools when available; preserve Product + ICP + Angle + CopyLine lineage.
 - **Before analyzing performance or proposing tests** → read [resources/OPTIMIZATION.md](./resources/OPTIMIZATION.md).
@@ -29,6 +44,15 @@ This file holds the rules that always apply. Task-specific depth lives in resour
 - **For golden-path conversation scripts** → read [resources/EXAMPLES.md](./resources/EXAMPLES.md).
 
 ---
+
+## HARD RULE — irreversible actions need the user's yes, and the server checks
+
+`delete_funnel`, `delete_page`, `delete_variant`, `delete_website_page`, `delete_lead_magnet`, `delete_form_destination`, `delete_campaign_hub`, `delete_campaign_draft`, `delete_research_document`, `delete_research_folder`, `publish_funnel`, `unpublish_funnel`, `publish_website` and `unpublish_website` are **two-step**:
+
+1. Call the tool with its normal arguments. **Nothing changes.** The response is `{ confirmation_required: true, executed: false, action, summary, irreversible, details, confirmation_token, expires_at, next_step }` — `summary` says exactly what would happen (names, page/variant counts, live domain, whether it can be undone).
+2. Show the user that `summary` and ask. **Only after the user explicitly says yes**, call the same tool again with **the same arguments** plus `confirmation_token`. The token is valid 10 minutes and only for this workspace, this tool and these exact arguments; a mismatched, expired or edited token returns a fresh preview (`token_rejected`) and changes nothing.
+
+Never send a token the user did not approve, never reuse one for a different target, and drop it if they say no. `confirm: true` is deprecated and authorizes nothing.
 
 ## Confirming the skill is loaded (onboarding verification)
 
@@ -40,7 +64,7 @@ If the user asks you to confirm the skill is installed — e.g. **"Granvl: confi
 
 If you got this skill through the granvl plugin, it updates with the plugin — nothing to do. The Granvl MCP also exposes **`get_skill`**, which returns the canonical bundle, for clients that keep their own copy:
 
-- Optionally, at the start of a session, call `get_skill` with `since_version` set to the version you last saw. `upToDate: true` → you're current, carry on.
+- Optionally, at the start of a session, call `get_skill` with `since_version` set to the version you last saw. `upToDate: true` → you're current, carry on. By default the response is SKILL.md plus a file index; fetch a resource with `get_skill({ file: 'resources/PAGE-BUILDING.md' })` when a task needs it, or `include: 'all'` to install every file.
 - Otherwise the response carries `version` and `files[]` (each `{ path, content }`). You can read the files straight from the response. If your client keeps a local copy, `installPaths` names the directory for your client (`claude`, `codex`, `other`); writing there is optional and never required to use granvl.
 - It's read-only — `get_skill` never edits the server's skill.
 
@@ -48,7 +72,7 @@ If you got this skill through the granvl plugin, it updates with the plugin — 
 
 ## START HERE — get your bearings every session
 
-**Before anything else — building, editing, advising — call `list_funnels`, and `get_brand_kit` for the domain you're about to touch.** Together they tell you what's already live and what this customer looks and sounds like. Building without reading them is how a generic page happens.
+**Before anything else — building, editing, advising — call `get_workspace_context`.** It returns the workspace's `granvl.md`: a CLAUDE.md-style memory file (business type, brands/domains in play, audience, voice, accumulated CRO learnings). Read it, follow it, keep it current with `update_workspace_context` (whole-file replace: read, modify, write the complete doc back). When it comes back `empty`, run the intake below and save the result before building. Then call `list_funnels`, and `get_brand_kit` for the domain you're about to touch.\*\* Together they tell you what's already live and what this customer looks and sounds like. Building without reading them is how a generic page happens.
 
 Brand specifics — colors, fonts, logo, voice — live in the **brand kit**, per domain. Durable CRO findings live in **learnings** (`save_learning` / `list_learnings`), per funnel. Those two are your memory between sessions; keep them fed.
 
@@ -62,7 +86,7 @@ When `list_funnels` returns nothing, **don't silently proceed with a generic bui
 4. **Voice / tone** — three words is plenty ("modern, trustworthy, premium").
 5. **Primary goal** for most pages — leads, sales, signups, bookings?
 
-Use the answers in this session, and put the durable half where it survives: brand colors, fonts, logo and voice into the domain's brand kit via `update_brand_kit`.
+Compose a clean `granvl.md` from the answers and save it with `update_workspace_context`; put brand colors, fonts, logo and voice into the domain's brand kit via `update_brand_kit`. Append durable learnings to `granvl.md` over time — it is read at the start of every session.
 
 ### Brand-new workspace → build a first page immediately (don't just talk)
 
@@ -88,19 +112,65 @@ If the workspace is an **agency** (multi-brand / multi-domain), then **each doma
 
 ---
 
+## Marketing capabilities — generation and research on granvl credits
+
+granvl can run image generation, video generation, and cited web research for the workspace, billed in **Tool credits** — the workspace's one pool for everything the agent runs through granvl (provider price plus a small margin, charged only on success). Always talk about costs in credits; never translate credits into dollars or cents. This is so the user has one bill instead of seven API accounts. Rules:
+
+- **`list_capabilities` first.** It returns the models this workspace may use (its region settings hide some), each model's region and rough price, and the balance. Pick from that list; a model that isn't there is not allowed here.
+- **Cards show the media — never paste a media URL in chat.** On hosts with MCP Apps (Claude, ChatGPT), generated images, the format gallery, the video setup picker, the stills review and finished videos show on their cards. Never embed an image, preview, asset or mp4 URL as a markdown image (chat hosts render a broken placeholder), and don't paste the mp4 as a link either: name it (asset id, `creative_id`) and link the asset library (`asset_library_url`) if needed.
+- **Widgets in Claude and ChatGPT (MCP Apps).** Many results render as cards: images and raw clips (`generate_image`, `upload_image`, `generate_video`, `poll_video_generation`) and storyboard runs (`poll_video_render`, `list_video_runs`) on the creative card; the format gallery; the video setup picker, the stills review and the voice / music / caption pickers; landing-page previews with weight sliders and a change box; keyword plans with switches and “Build with these”; competitor ad cards with “Borrow this angle”; the campaign pre-flight checklist. Where the host lets a card call tools, some buttons **act** and tell you through model context: the image card's Three variations (three `generate_image` calls, “Generated 3 variations of …: …”), Try again (“Regenerated … with note '…': …”) and Approve (a note only, “Image approved: …”), and the look check's Approve / Switch (`approve_video_stills`, then the card polls the render: “Stills approved for run … (about N more credits approved, max_credits M)”, “Stills switched to '…' for run …”, “Video run … completed: creative …”). Treat those notes as done work: don't redo the call, use the ids they name, and summarise the result in a sentence. Every other tap — and an acting button on a host that can't run the call — arrives as a chat message (“Video setup: …”, “Use voice …”, “Set traffic weights on page …”, “Pre-flight approved …”): act on it as the user's instruction.
+- **Confirm big spends.** A call estimated over 20 credits — a large image, the rest of a video at `approve_video_stills`, a `render_video` whose look is already approved — returns `needs_confirmation` with `estimated_credits`. Tell the user the number, get a yes, call again with `confirm: true` (for a video, plus `max_credits: suggested_max_credits`). A card button that names the cost (the image card's yes, the look check's **Approve · ~N credits**) is that yes. The look-check stills and a look switch are drawn without asking (≤ ~30 credits). Cheap research runs without asking.
+- **Say the cost.** Every result carries `credits_charged` and `balance_credits`; mention them when the user asks or when a balance is running low. The user-facing name is **Tool credits** — one pool for generation, research and hosted AI; the full history is at Settings → AI / MCP → Credit history. If a call fails with "Not enough credits", say so and point at the credits counter in the dashboard header — never retry in a loop.
+- **When a spend is refused, stop and explain.** The spend guard can refuse with: "Your role in this workspace cannot spend credits" (only owners, admins and members can — ask an admin), "faster than allowed" (a burst limit; wait a few minutes), "daily allowance of … calls" or "daily capability spending limit" (a per-workspace ceiling that resets as earlier spend ages out; an owner can ask support to raise it). Relay the message, do not retry in a loop, and do not route around it with a different tool or model.
+- **Content rules (Terms §7):** no real person's likeness or voice without their documented consent, nothing involving minors, no deceptive endorsements or impersonation, no political campaign material. Don't strip watermarks or content credentials. Disclose AI-generated content where the platform requires it.
+- **Regions.** Every model shows where it is served (US; Singapore for Seedance). All regions are on by default; a workspace owner can turn one off in Settings → AI / MCP, after which its models disappear from list_capabilities. Never work around a region refusal by picking the same model elsewhere.
+
+### Images and static ad creative
+
+- **Two image models: nano-banana-2.1 (the default — `model` is optional) and gpt-image-2 (when the user asks for ChatGPT's image model). No others**; any other id is rejected.
+- **`generate_image`** `{ brief, model?, reference_asset_ids?, use_product_images?, aspect_ratio?, resolution?, funnel_id? }` (the brand kit's product images are attached as references by default — set them once with `update_brand_kit` `product_image_asset_ids`) → a workspace asset (id + CDN URL) you can drop into variant HTML or push as an ad creative. **Only the brief, your chosen reference assets, and the settings reach the provider** — nothing from the workspace rides along, so put everything the image needs in the brief (brand colours, product, style). Contact details and credential links are stripped.
+- **Where images get rendered depends on your host.** If you are ChatGPT or Codex (an OpenAI client), you have your own image generation: render the composed prompt with it, then `upload_image` the result so it lives in the workspace — do NOT spend granvl credits on `generate_image`. If you are Claude, Grok, or any client without native image generation, render with `generate_image` on granvl credits. Either way the brief comes from `compose_creative_brief` first, and the uploaded or generated asset shows in the creative-review card. Video is granvl on every host (below).
+- **Ad creative starts from the library.** For any static image ad (never a video — these are not video templates): `list_creative_formats` (on MCP Apps hosts a gallery card — the user opens a format and taps “Use this format”, which arrives as a chat message naming it; other hosts get the previews inline. Either way ask the user which ones they like, or pick 3–5 that fit the offer's awareness level and the brand's tone; it pages 20 at a time and `by_category` says what else exists — filter by `category` Awareness | Conversion | Punch & Mockup or `awareness`, and page with `offset`, before saying the library lacks something), `get_creative_format` for the full brief, write the concept yourself (angle, exact headline, supporting line, only verified facts), then `compose_creative_brief` → one render-ready prompt. Render it with `generate_image` on granvl credits, or with your own image tool and `upload_image` the file. Vary angles AND formats across a set; never ten versions of one idea.
+
+### Video
+
+- **Routing — read this before any video request.** "video" / "video ad" / "make some videos" / "explainer" / "video templates" / "show me the templates" (for a video) → **`setup_video` first**, then the storyboard flow below. `list_creative_formats` is the STATIC IMAGE ad library and Seedance / Veo are clip models, not templates: never present either as a video template, and never quote a raw clip's price as the cost of a video ad. `generate_video` only when the user explicitly wants one raw clip.
+- **The storyboard flow** — a 30–75s "faceless" explainer ad: one illustrated still per spoken line, slow push-in, word-timed captions with a highlighted keyword, stat cards, end card. Never build one by prompting `generate_video` clip by clip.
+  1. **`setup_video`** — the template picker card: four templates, each a look + narrator + music bed + caption style. The user picks one, taps **Use template** and walks the short stepper (look → voice → music → captions → review) with the template's picks pre-selected; **Continue** sends one chat message: "Video setup: Clay look, Brian narrating, Inspiring Piano music, Yellow block caps captions. Ready for the script." Map the names to ids from the result (`templates[].id`, `voices[].voice_id` + `model`, `music[].id`, `caption_presets[].id`), then go straight to the script questions (subject, offer, audience, numbers) — never re-ask the look, voice, music or captions. Skip it only when the user already named a look and a voice; `list_video_styles`, `list_voices`, `list_music_tracks` and `list_caption_presets` then cover whatever is left. Save the narrator to granvl.md.
+  2. **`create_video_storyboard`** with those picks (`style_id`, `voice`, `music_track_id`, `caption_preset`) and the script as beats: hook as a question or pain → specifics with numbers in `overlay` → reframe → CTA beat; `pause` after the hook; recurring characters described once in `characters` (for the same people in every still, generate one character sheet with `generate_image` and pass it as `character_asset_ids`); 1–3 hero beats `motion: 'animate'` for real motion (a full Seedance clip, ~128 credits each; falls back to the still). It returns `estimated_credits` (one still plus a 1-credit critic review per beat, the motion clips, the voice, the render) and `suggested_max_credits` (the estimate + 15%). Nothing is generated yet.
+  3. **`render_video { run_id, max_credits: suggested_max_credits }`** — don't ask first. It draws the first three stills for the look check (≤ ~30 credits, returned as `look_check_credits` — mention it if useful), and **every run** then waits in `status: 'review'` (if it comes back still drawing, poll `poll_video_render` until `review`). Pass `suggested_max_credits`, never the bare estimate: `max_credits` caps the whole run, and a normal provider overrun would stop it mid-way. The balance must cover the whole run before the first still.
+  4. **`review_video_stills { run_id }`** — the look check and the one cost question. The card shows the stills with **Approve · ~N credits** (N = the rest of the video) and **Change the look** (**Switch · ~N credits** redraws the new look's first stills without asking, then checks again). The tap is the user's confirmation: the card calls `approve_video_stills` itself and polls the render. Without the card, tell the user the remaining cost and, on a yes, call `approve_video_stills { run_id, approve: true, confirm: true, max_credits: suggested_max_credits }` (a switch: `approve: false, style_id`).
+  5. **Done.** Without a card, poll `poll_video_render` every ~20–30s until `completed`. On MCP Apps hosts the look-check card keeps polling after the approval, and `poll_video_render` / `list_video_runs` render on the creative card: progress that polls itself (one advance per run runs at a time server-side, so polling alongside it is safe), then a player with **Download**, **Use as ad creative**, **Make a variant** and **Change a beat**. Say it's ready and name the `creative_id` — the mp4 is in the creative bucket for `attach_creatives_to_campaign` / `add_creatives_to_testing_flow`.
+- **Variants and edits are cheap.** `create_video_variant` (a new hook in beat 1, CTA, style or caption preset) reuses every unchanged still and voice clip — three hooks on one body cost one body plus three hooks; `update_video_beat` fixes one beat and re-renders only what it touches; `render_video { caption_preset }` on a finished run re-renders with render credits only (`list_caption_presets { run_id }` animates the five styles on the video's own first line). Beat edits and same-look variants keep the look approval (a new `style_id` gets its own look check), so their `render_video` has no review pause and confirms the remaining cost itself: above 20 credits it returns `needs_confirmation` — ask, then call again with `confirm: true` and `max_credits: suggested_max_credits`. `skip_look_check: true` does the same for re-rendering a look the user already approved; never on a new look. Stills pass a vision critic and are redrawn when they show text or broken anatomy.
+- **ChatGPT / Codex (native image generation): don't spend granvl credits on the stills.** `create_video_storyboard` returns `still_prompts` (the exact prompt per beat); render each with your own image model at the storyboard's aspect, `upload_image` it, attach the ids with `update_video_beat { still_asset_id }`, then `render_video` — only the critic review, the voice and the render use credits.
+- **One raw clip: `generate_video`** `{ model, brief, first_frame_asset_id?, reference_asset_ids?, duration_seconds?, aspect_ratio?, resolution?, audio?, funnel_id? }` → a `job_id` — only when the user explicitly wants a single Seedance / Veo shot (no narration, captions, music or template look). Poll **`poll_video_generation`** `{ job_id }` every ~20 seconds until `status` is `completed` (the card polls it too; the clip is charged once, on completion — a failed or expired job is free). Tell the user it takes a minute or three.
+
+### Research and campaign planning
+
+- **`research_web`** `{ query, model?, depth? }` → an answer with source URLs. Use it for competitor offers, pricing, audience language, regulation. Save what matters into a research document; results are for this workspace, never bulk-exported or republished raw.
+- **Competitor ads and landers.** `list_competitor_ads` first (free — what the workspace already has). Then `research_competitor_ads` — `query` with the service ('ac repair', 'hvac replacement') for 'what ads are running for X' and for format / angle research (every advertiser, the default; national, US-oriented, English-language ads — there is no location filter, so search the service, never the city; call with `estimate_only: true` first and tell the user the cost), `brand` / `domain` only when the user names a competitor — returns what they are running longest-first with each ad's landing page and thumbnails inline, and SAVES every ad to Research → Ads. Right after, tell the user you are filing insights, then file your own wording of each ad's **offer** and **hook** plus an angle with `save_competitor_insights` (use each ad's `saved_id`; re-word, never paste their copy — that is what the user sees on the cards). `research_landing_page` tears down any page with a screenshot; pass `ad_id` so the teardown attaches to the saved ad. Use all of this inside deep research and whenever the user names a competitor. Media stays on the provider's URLs.
+- **Research first, and ask.** When the user wants a campaign for an offer, or asks to research a niche, and the workspace has no approved research document for it (check `list_research_documents` → `get_research_document`, free), call `start_offer_research` (an offer) or `start_niche_research` (a niche with no specific offer) with `estimate_only: true` (free, starts nothing) to get the credits and minutes, then say "I can run deep research on this first — buyer psychology, their exact words from reviews and Reddit, competitors, keyword demand, the ads running, objections — it takes about M minutes and N credits. Want me to?" (`mode: 'standard'` is the cheaper, shallower run when they want a quick read.) On yes: call it again without estimate_only (show the `quick_read` immediately), then `poll_offer_research` about every 2 minutes (each pending reply says how long it has run and when to check again). Every run comes back as the same twelve-section research report — executive summary, market snapshot, keyword opportunity, competitors & offers, paid ads & landing pages, customer voice, buyer journey, objections, messaging angles, compliance, gaps & next steps, sources — and it is FILED for you: the completed poll carries `document_id` / `document_url`, the structured `report`, and every cited quote and source is already an evidence row linked to it. Do not create a document yourself; open the link, summarise the executive summary in three sentences, and if `report.customerVoice.quotes` is thin (fewer than ~8) run `deepen_offer_research { job_id }` right away — Sonar Pro pinned to Reddit / Trustpilot / Yelp / YouTube, 10–15 credits, no confirm — which adds the new quotes to the report itself. Same tool when the user asks for more voice, objections or competitor detail later. **Already researched?** If a report for the niche and market is under 30 days old, `start_offer_research` / `start_niche_research` return it (`status: 'existing'`) instead of running — offer the user three paths, never a second niche run: use it (`get_research_document`), go deeper in place (`deepen_offer_research { document_id, sections }` with `more_competitors`, `more_objections`, `compliance`, `keywords`, `ads` or the quote sections — each grows its section of the same report), or break out (`start_breakout_research { parent_document_id, focus: 'offer' | 'angle', offer | angle }` — a focused child report under the parent that reuses its keyword table and ads, standard mode, a few minutes). Only on an explicit "start over" pass `if_exists: 'new'`. On no, or when the user brought their own docs, build from what you have. The campaign build itself stays modular: strategy brief, copy, creatives, campaign tools — pull in whichever parts fit. When the report lands, read `coverage` in the result: a `thin` or `fair` level means the floors (10 quotes, 3 competitors, 15 evidence sources) were not all met even after the automatic passes — say so and offer `deepen_offer_research`. If your host has a browser pane, call `get_research_document { format: 'html' }`, write it to a local .html file and open it there so the user reads the full report formatted.
+- **Pick the entry point, don't force the kickoff.** The Search workflow is also available in parts: `research_keywords` (numbers only), `classify_keywords` (intent on any list, free), `build_keyword_plan` (themes + negatives + structure from rows you already have, free). If the user brought a keyword list, classify or build from it; if they only want data, research; if they are starting from nothing, run the full plan.
+- **`plan_search_campaign`** `{ offer, country, city?, vertical?, landing_page_url?, competitor_domains?, … }` is THE way to do Google Search keyword work when it is available: one call returns buying-intent themes (one service intent on one system — AC Repair, Furnace Installation — spellings inside) with exact + phrase keywords, a starting CPC per theme (the median low top-of-page bid, deliberately under the average CPC; raise on low impression share), day-one negatives, the campaign structure, and a saved research document. Call it with `estimate_only: true` first when the user asks what it costs. Build from its `next` instruction — and if the Google campaign tools are not in your list, Google Ads is not connected: say so and hand over the document, never improvise around it. Numbers are USD from Google Ads data. Then **`triage_search_terms`** `{ account_id, days? }` on a schedule (every 3 days) sorts the live search-term report into keep / review / suggested negatives — show the suggestions, never add negatives without the user's OK. If these tools are not in your list, fall back to the GOOGLE-ADS.md research recipe.
+- **Pre-flight before any build.** After the plan and before create_google_search_campaign / create_meta_campaign / create_microsoft_search_campaign, call `campaign_preflight` { platform, landing_page_url, daily_budget_usd, keywords, negatives, bid_strategy, conversion_tracking_confirmed }. Show the checklist; build only on the user's go-ahead; fix failures first, never build around them.
+
+Credits: `get_credits` answers "how many credits do I have" (SMS verification, email / phone validation allowances, the AI pool and when it resets). Top-ups are on the dashboard Billing page.
+
+---
+
 ## TL;DR — Mental model
 
-| Concept               | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Concept               | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Funnel**            | A campaign container. One funnel ≈ one ad campaign or one product offer. Optionally connected to a domain, with a conversion type, an optional qualification rule, and one or more pages. **Many funnels can share one domain** — they're disambiguated by page slug, which must be unique across all funnels on that domain. That includes the root slug `'/'` — one live funnel owns a domain's root at a time. To swap the live root page, archive or unpublish the old funnel first (a released slug is free to claim); a `/` still live on the domain is refused at create/rename/attach time. |
-| **Page**              | A URL path inside a funnel. Type is `LANDING`, `QUIZ`, `THANK_YOU`, `FORM`, or `MAGNET` (post-conversion lead-magnet content — see Lead magnets below). Conversions fire client-side **at the moment of the action** (form submit / converting click), not on TY-page arrival — the `_cv`-redirect chain is a deduped fallback. `CLICK_THROUGH` events are intra-funnel page navigation only (not user-facing conversions).                                                                                                                |
-| **Variant**           | One HTML version of a page. Multiple variants per page = A/B test. Each has a `weight` (0–100) and traffic-routing is server-side and sticky.                                                                                                                                                                                                                                                                                                                                                                                              |
-| **VariantVersion**    | Every change to `htmlContent` writes a snapshot row with provenance (`AI_GENERATED` / `AI_EDITED` / `HUMAN_EDITED` / `IMPORTED`) + the prompt that produced it. Read past versions with `list_variant_versions`.                                                                                                                                                                                                                                                                                                                           |
-| **Domain**            | A custom hostname (e.g. `quote.example.com`). Account-level — a funnel connects to at most one domain, but a single domain can host multiple funnels (each funnel's pages live at distinct slugs).                                                                                                                                                                                                                                                                                                                                         |
-| **AnalyticsEvent**    | Every visit, conversion, scroll milestone, bounce, web vital, and bot hit. Auto-enriched with geo, device, UTMs, click IDs, traffic type, visitor identity. CONVERSION rows carry structured `conversionAction` (`'form_submit' \| 'click_through'`) and `conversionQuality` (`'qualified' \| 'unqualified' \| null`).                                                                                                                                                                                                                     |
-| **LeadQualification** | One row per `(sessionId, funnelId)` saying whether the lead was qualified — by rule (form-submit match), by webhook (CRM deal-close echo), or manual flip. Closes the {variant, audience, outcome} loop with downstream quality data.                                                                                                                                                                                                                                                                                                      |
-| **SessionJourney**    | One materialized row per session per funnel — funnel structure at the time of visit, the path taken, audience features, outcome, qualification, deal value. Read with `list_session_journeys`.                                                                                                                                                                                                                                                                                                                                             |
-| **AiActivity**        | Audit feed of every successful tool call you make. Surfaces in the user's dashboard "Claude Activity" panel — narrate well.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Page**              | A URL path inside a funnel. Type is `LANDING`, `QUIZ`, `THANK_YOU`, `FORM`, or `MAGNET` (post-conversion lead-magnet content — see Lead magnets below). Conversions fire client-side **at the moment of the action** (form submit / converting click), not on TY-page arrival — the `_cv`-redirect chain is a deduped fallback. `CLICK_THROUGH` events are intra-funnel page navigation only (not user-facing conversions).                                                                                                                                                                         |
+| **Variant**           | One HTML version of a page. Multiple variants per page = A/B test. Each has a `weight` (0–100) and traffic-routing is server-side and sticky.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **VariantVersion**    | Every change to `htmlContent` writes a snapshot row with provenance (`AI_GENERATED` / `AI_EDITED` / `HUMAN_EDITED` / `IMPORTED`) + the prompt that produced it. Read past versions with `list_variant_versions`.                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Domain**            | A custom hostname (e.g. `quote.example.com`). Account-level — a funnel connects to at most one domain, but a single domain can host multiple funnels (each funnel's pages live at distinct slugs).                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **AnalyticsEvent**    | Every visit, conversion, scroll milestone, bounce, web vital, and bot hit. Auto-enriched with geo, device, UTMs, click IDs, traffic type, visitor identity. CONVERSION rows carry structured `conversionAction` (`'form_submit' \| 'click_through'`) and `conversionQuality` (`'qualified' \| 'unqualified' \| null`).                                                                                                                                                                                                                                                                              |
+| **LeadQualification** | One row per `(sessionId, funnelId)` saying whether the lead was qualified — by rule (form-submit match), by webhook (CRM deal-close echo), or manual flip. Closes the {variant, audience, outcome} loop with downstream quality data.                                                                                                                                                                                                                                                                                                                                                               |
+| **SessionJourney**    | One materialized row per session per funnel — funnel structure at the time of visit, the path taken, audience features, outcome, qualification, deal value. Read with `list_session_journeys`.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **AiActivity**        | Audit feed of every successful tool call you make. Surfaces in the user's dashboard "Claude Activity" panel — narrate well.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ---
 
@@ -135,10 +205,11 @@ The decision tree below routes each question to its tool. Universal habits:
 
 ## Paid ads — universal invariants (all platforms)
 
-granvl can build ad campaigns on Meta, Google (Search + Demand Gen), and Microsoft (Bing) directly from the conversation. These invariants hold on EVERY platform (server-enforced — don't fight them):
+granvl can build ad campaigns on Meta, Google (Search + Demand Gen), and Microsoft (Bing) directly from the conversation. The platform tools appear in your list once an ad account is connected (see "Your tool list is tiered" above) — if they are missing, connecting the account is step zero. These invariants hold on EVERY platform (server-enforced — don't fight them):
 
 - **Everything is created PAUSED.** You may pause campaigns, but never enable — going live is always the human's action in the platform's own ads manager. There is deliberately no activate tool. Close every build by telling the user where to flip the switch.
 - **Budget guardrail:** daily budgets (and bids) are capped at min(the workspace admin's cap, granvl's **$200/day** platform ceiling) before any write. An over-cap request returns the cap in the error — relay it, NEVER work around it.
+- **Budget raises are capped at 20% per change** (platform ceiling; an account's guardrail can only be lower), and every raise is a proposal a workspace member approves — you never apply one. Scaling a winner is a series of ≤20% steps, each approved; a bigger jump is the user's to make in the platform's Ads Manager. Do not split one raise into several proposals to get around it.
 - **Plain URLs, never pre-tagged:** granvl applies each platform's UTM template automatically so spend joins first-party conversions. Every destination URL you provide stays plain.
 - **Pages before ads:** final URLs on granvl domains must be LIVE — publish first.
 - **BROAD match keywords require `allow_broad_match: true`** — set only after the user explicitly chooses broad despite your warning.
@@ -168,6 +239,16 @@ several client workspaces                  switch_workspace        (by id or nam
 
 "Remember this about our brand"           → update_brand_kit        (colors, fonts, logo, voice)
 "Note that <CRO learning>"                 save_learning            (per funnel; read with list_learnings)
+
+"Build my website" / "brand site"         → create_website        (one per brand; roster of fixed roles)
+"Add an About page to the site"            create_website_page  (role: HOME|SERVICES|ABOUT|CONTACT|EXTRA|PRIVACY|TERMS;
+                                           [read resources/PAGE-BUILDING.md]  put {{SITE_HEADER}} / {{SITE_FOOTER}} in the HTML)
+"Change the site header / colors / menu"   set_website_layout   (shared by every page; {{SITE_CTA}} = main button)
+"Make the site button go to <funnel>"      set_website_button
+"Put the site live"                        update_website (domain_id) → publish_website
+                                           # Websites are NOT funnels: no variants,
+                                           # no split tests, one form max (Contact).
+                                           # Landing pages stay funnels on the same domain.
 
 "Build me a landing page for X"          → ASK shape + platform first → see "Before building"
 "Create something for <topic>"             create_funnel        (with funnel_type + platform)
@@ -257,12 +338,65 @@ several client workspaces                  switch_workspace        (by id or nam
                                            playbook as Google Search; always
                                            created PAUSED.
 
+"Build a pre-sell / advertorial page for   → read resources/SHOPIFY.md FIRST:
+ my Shopify product"                        list_store_products → create_funnel
+                                           ({ funnel_type: "click_through" }) →
+                                           create_variant with productUrl as a
+                                           PLAIN link + data-pages-convert.
+"How did the store do? Which ads make    → get_store_summary / get_store_attribution
+ money? Best products?"                    / get_store_products (read SHOPIFY.md
+                                           for the pinned metric definitions)
+
 "What's going on in my account?"         → get_daily_brief    (the Morning Brief —
 "Anything I should know today?"            free read; same brief the user sees.
                                            Good first call of a session to orient.)
 "What did the optimizer do?"             → list_optimization_actions (narrate it)
 "What should I do next?"                 → get_optimization_suggestions
+"Find me keywords for HVAC / <offer>"     → plan_search_campaign   (DEFAULT for a generic ask: it
+"Best keywords for <vertical> in <city>"    researches with keyword data, filters to buying
+"Plan / set up a Google Search campaign"    intent, clusters themes, sets CPC + negatives, saves
+                                           the plan; then build from its `next`)
+"Just give me search volume for <terms>"  → research_keywords      (numbers only, no plan)
+"Are these keywords any good?"            → classify_keywords      (free; intent + reasons on
+"Which of these should be negatives?"       any list the user brought)
+"Here are my keywords, structure them"    → build_keyword_plan     (free; themes + match types +
+                                           CPC + negatives from rows you already have)
+"Review my search terms / add negatives"  → triage_search_terms    (read-only suggestions; the
+"Set up the weekly negatives check"         user approves, THEN add_google_negative_keywords;
+                                           schedule it every 3 days)
+"Make me an image / ad creative / hero"   → list_creative_formats → get_creative_format → compose_creative_brief
+                                           → ChatGPT / Codex: render with your own image model + upload_image
+                                           → Claude / Grok / others: generate_image (granvl credits)
+"Just generate this image"               → ChatGPT / Codex: your own image model + upload_image
+                                           → others: list_capabilities → generate_image (confirm if > 20 credits)
+"Make a video / video ad / explainer"     → setup_video FIRST (template card: Use template → stepper)
+"Show me the video templates"              → create_video_storyboard (quote estimated_credits)
+                                           → render_video (max_credits = suggested_max_credits; no question:
+                                             it draws the first 3 stills, then the run waits in review)
+                                           → review_video_stills (the ONE cost question: Approve · ~N on the card)
+                                           → poll_video_render → plays on the card; name the creative_id
+                                           # variants: create_video_variant / update_video_beat
+                                           # NEVER list_creative_formats (static images) or raw-clip prices
+"Just one raw clip (Seedance / Veo shot)" → list_capabilities → generate_video → poll_video_generation
+                                           (only when the user explicitly wants a single raw clip)
+"Research <competitor / market / offer>"  → research_web           (cited; save to a research doc)
+"Make me a campaign for <offer>" (no doc) → list_research_documents → ask → start_offer_research
+                                           → quick_read now → poll_offer_research (the report is filed for you)
+                                           → then the modular build (brief / copy / creatives / campaign tools)
+"Do deep research on <offer>"            → same, without the ask
+"Research the <niche> market"            → start_niche_research (estimate_only first) → poll_offer_research → open document_url
+"Go deeper on <section> of that report"  → deepen_offer_research { document_id, sections: [...] }   (in place, no new run)
+"Research <offer> / <angle> from it"     → start_breakout_research { parent_document_id, focus, offer | angle } → poll_offer_research
+"What ads is <competitor> running?"       → list_competitor_ads → research_competitor_ads (estimate_only first; brand or domain) → save_competitor_insights → research_landing_page on their landers
+"What ads are running for <niche>?"      → research_competitor_ads (estimate_only first; query: the service — national, US; never the city) → save_competitor_insights → research_landing_page on the longest-running landers
+"Tear down / look at this landing page"  → research_landing_page
 "What have we already tried?"            → get_research_history (BEFORE proposing tests)
+
+"What do we know about <brand/offer>?"   → list_research_documents → get_research_document
+"Write up / file this research"            update_research_section  (one ## section at a time)
+"Start a foundation doc for <offer>"       create_research_document (template, then fill sections)
+"Save this source / quote"                 save_research_evidence { document_id, items } (creates + links); attach_research_evidence only re-files an existing row
+"Organise the research library"            create_research_folder / update_research_document (folder, tags, status)
 "Record what this test taught us"        → save_learning
 
 "What's running right now?"              → list_funnels
@@ -339,6 +473,8 @@ several client workspaces                  switch_workspace        (by id or nam
 "Map my form to LeadProsper"             → list_leadprosper_campaigns (campaign fields + suppliers)
 "Send TrustedForm / source to LP"          set_leadprosper_destination (explicit field map; static:<value>
                                                                   for constants; idempotent)
+"Hook this up to Lead Distro"             → set_leaddistro_destination (campaign + source ids + x-api-key
+                                                                  from the Inbound API Specs page; test_lead while verifying)
 "Pause / rename / reorder a destination" → update_form_destination (enabled, label, sort_order 0 = primary,
 "Change the hidden fields it sends"                               hidden_fields)
 "Map / copy ActiveCampaign fields"       → get_form_destinations (meta.acFields = AC's fields + required flags,
@@ -346,7 +482,7 @@ several client workspaces                  switch_workspace        (by id or nam
                                            # { "<form input name>": "<AC field name>" }. To copy a mapping to
                                            # another funnel, read the source's meta.fieldMap and provide it as-is.
                                            # Map every required AC field or AC rejects the lead.
-"Remove this integration"                → delete_form_destination (one by id; confirm first)
+"Remove this integration"                → delete_form_destination (one by id; two-step: preview → user yes → token)
 
 "Did my webhook / GHL hookup work?"      → send_test_lead       (synthetic lead, union of ALL variants'
 "Send a test lead so I can map fields"                            form fields; GHL's mapper needs one
@@ -364,6 +500,9 @@ several client workspaces                  switch_workspace        (by id or nam
 "Prove consent / TCPA cert on leads"     → update_funnel         (trusted_form_enabled: TrustedForm
                                                                   snippet + xxTrustedFormCertUrl
                                                                   field on every lead)
+
+"TrustedForm on every page of a domain"   → update_domain_tracking (trusted_form_default: true; funnel OR
+                                                                  domain; get_domain → trusted_form_default)
 
 "Set up qualified-lead tracking"         → set_qualification_rule (rule JSON)
                                            get_qualify_webhook_url (URL for the user's CRM)
@@ -384,7 +523,7 @@ The contract after `create_funnel_from_template`:
 
 1. **Creating the funnel is the easy half — the copy adaptation IS the build.** The instantiated pages carry the template's example vertical and placeholder copy ("Your Brand", the template's own questions). Rewrite headline, questions, options, and thank-you copy for the user's actual product. Adapt as **copy surgery**: swap text and colors while keeping the template's structure, classes, and step wiring intact — the quiz JS (`data-step`, `var TOTAL=N`, hidden answer fields) is load-bearing. If you change the number of steps or options, renumber `data-step`, update `var TOTAL`, and keep one hidden input per option-question key.
 2. The response's `pages[].variantIds` names exactly the variants to adapt — re-read each (`get_variant_html`) when done and confirm no template copy survived.
-3. **Wire lead delivery** — template forms point at the built-in fallback until a destination is configured (`get_form_destinations` / `set_form_destination`; LeadProsper with a field map: `set_leadprosper_destination`).
+3. **Wire lead delivery** — template forms point at the built-in fallback until a destination is configured (`get_form_destinations` / `set_form_destination`; LeadProsper with a field map: `set_leadprosper_destination`; Lead Distro: `set_leaddistro_destination`).
 4. End with a preview link (`create_preview_link`) so the user can see the adapted funnel.
 
 ## New funnel vs. new variant — default to new
@@ -562,12 +701,12 @@ Recipes (cross-funnel duplication, `TYPE_MISMATCH`, funnel cloning, the guardrai
 A `CONVERSION + action=form_submit` says the visitor submitted; a `LeadQualification` row says whether the lead was any good. Three paths populate it:
 
 - **Rule-based** (synchronous): `set_qualification_rule(funnel_id, rule)` — a JSON rule evaluated against form data **in memory at submit time**; the result is recorded, then the field values are discarded (zero-PII by design). For external-CRM forms the rule runs client-side in the visitor's browser — values never leave the device. Rule shape: `{ type: 'all'|'any', conditions?: [{ field, op, value }], children?: [Group] }`, nested up to 5 levels; full shape + operators in [resources/REFERENCE.md](./resources/REFERENCE.md). Note: the dashboard builder only edits flat rules; nested ones render read-only there.
-- **Webhook-back** (asynchronous): every submission carries `granville_lead_id` (plus `granville_variant_id` / `granville_funnel_id`, so the CRM knows which variant produced the lead); the user's CRM/Zapier POSTs `{ lead_id, qualified, value? }` to the workspace's qualify URL when a deal closes. `get_qualify_webhook_url()` returns URL + setup notes.
+- **Webhook-back** (asynchronous): every submission carries `granville_lead_id` (plus `granville_variant_id` / `granville_funnel_id`, so the CRM knows which variant produced the lead); the user's CRM/Zapier POSTs `{ lead_id, stage, qualified?, value? }` to the workspace's qualify URL on every pipeline move — `stage` is the CRM's own stage name, mapped per domain to Contacted → Conversation → Booked → No show → Held → Quoted → Won / Bad contact / Not a fit / Lost (`get_domain → crm_stages`, `set_domain_crm_stages` for names that came in unmapped). `get_qualify_webhook_url()` returns URL + setup notes.
 - **Manual flips**: `mark_lead_qualified(session_id, funnel_id, qualified, value?, reason?)` — use sparingly.
 
 **Declare form schemas with `set_funnel_form_fields`** whenever you build or change a form — the rule UI then offers real dropdowns instead of field names guessed from your HTML.
 
-**Optimization implication:** when a funnel has qualification data, compare variants on `qualifiedConvRatePct`, not raw `convRatePct` — the variant producing more qualified leads is the one to scale. Qualified vs. unqualified leads can also route to different thank-you pages (`qualification_audience` on TY pages) — recipe in [resources/PAGE-BUILDING.md](./resources/PAGE-BUILDING.md) §8.
+**Optimization implication:** compare variants on the funnel's `leadingMetric` from `get_funnel_stats` (booked rate once the CRM reports, fit rate once a rule exists, else conversion rate) and name it. Fit and outcome are two signals: a variant with a high fit rate and a low booked rate means the rule needs tightening, not that the variant lost. Qualified vs. unqualified leads can also route to different thank-you pages (`qualification_audience` on TY pages) — recipe in [resources/PAGE-BUILDING.md](./resources/PAGE-BUILDING.md) §8.
 
 ---
 
@@ -634,6 +773,7 @@ For paid-ads strategy or general marketing unrelated to Granvl's product surface
 - Meta campaigns → [resources/META-ADS.md](./resources/META-ADS.md) **(required before any Meta build)**
 - Google Search / Demand Gen → [resources/GOOGLE-ADS.md](./resources/GOOGLE-ADS.md) **(required before any Google build)**
 - Microsoft Ads → [resources/MICROSOFT-ADS.md](./resources/MICROSOFT-ADS.md) **(required before any Microsoft build)**
+- Shopify stores — pre-sell pages, store attribution, margin → [resources/SHOPIFY.md](./resources/SHOPIFY.md) **(required before any ecommerce work)**
 - Tool args, schema, serve runtime, error catalog → [resources/REFERENCE.md](./resources/REFERENCE.md)
 - A/B sizing, CRO patterns, diagnosis playbooks → [resources/OPTIMIZATION.md](./resources/OPTIMIZATION.md)
 - Golden-path scripts → [resources/EXAMPLES.md](./resources/EXAMPLES.md)

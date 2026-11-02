@@ -12,7 +12,7 @@ The full authoring guide for variant HTML: form wiring, quizzes, embeds, styling
 
 **Granvl never stores form content.** Form submissions are zero-PII by design — there is nowhere on granvl's side that could ever hold an email, phone, or address from a form. This is a structural privacy guarantee, not a soft policy.
 
-**Implication:** every form on a Granvl-served page MUST point at an external destination (Formspree, GHL, HubSpot, ActiveCampaign, Supabase, etc.) for the lead to actually be captured. The `/api/form-submit` fallback exists but only fires the analytics event + handles the `_next` redirect — it does not persist field values. A funnel without a configured form destination will see zero leads in the user's CRM.
+**Implication:** every form on a Granvl-served page MUST point at an external destination (Formspree, GHL, HubSpot, ActiveCampaign, Supabase, Klaviyo for ecommerce newsletter / waitlist sign-ups, etc.) for the lead to actually be captured. The `/api/form-submit` fallback exists but only fires the analytics event + handles the `_next` redirect — it does not persist field values. A funnel without a configured form destination will see zero leads in the user's CRM.
 
 **Before generating any variant that contains a form, call `get_form_destinations(funnel_id)`.** It tells you whether the user has connected a third-party destination, and exactly how to wire the form so submissions go directly to that destination — Granvl is never in the data path.
 
@@ -26,9 +26,9 @@ If they want to proceed anyway (e.g. just testing), write a **bare form** (no `a
 
 ```html
 <form>
-  <input type="email" name="email" required>
-  <input type="text" name="first_name">
-  <input type="hidden" name="_next" value="{{THANK_YOU_URL}}">
+  <input type="email" name="email" required />
+  <input type="text" name="first_name" />
+  <input type="hidden" name="_next" value="{{THANK_YOU_URL}}" />
   <button type="submit">Get my quote</button>
 </form>
 ```
@@ -37,8 +37,8 @@ If they want to proceed anyway (e.g. just testing), write a **bare form** (no `a
 - **Use the `{{THANK_YOU_URL}}` template token** in `_next` — the serve route substitutes the funnel's thank-you URL at render time.
 - The `_next` URL is validated against the funnel's verified domain.
 - **Honeypot — the whole policy, stated once:** authoring one is OPTIONAL. Publish injects an off-screen `_gotcha` input automatically when it's missing, on every form, whatever the destination — no provider needs special-casing. If you do author it, make it a hidden `<input name="_gotcha">` placed as a **DIRECT child of `<form>`** (nested in a wrapper div, publish can't see it and injects a duplicate), styled `position:absolute;left:-9999px`. The server rejects any submission where a honeypot field (`_gotcha`, `website`, `url`, `homepage`, `phone_number_2`) is filled — which also means you must **never name a real field** `website`, `url`, `homepage`, or `phone_number_2` (use e.g. `company_website`).
-- **`submitted_at` is added for you.** At submit, publish stamps a hidden `submitted_at` input with the moment the form was sent, so every destination (native POST, fan-out mirrors, the broker, the CRM adapters) receives it. The format (ISO 8601 UTC by default; local ISO, `YYYY-MM-DD HH:mm:ss` UTC, US local, Unix seconds, or off) is a funnel setting under Conversion, next to the phone format. Don't author your own `submitted_at` field; map it at the destination if the CRM needs a named property (LeadProsper field maps must include it explicitly). Same for TrustedForm: when it is on, the snippet appends `xxTrustedFormCertUrl` (plus `xxTrustedFormPingUrl` / `xxTrustedFormCertToken`) to the form at capture time — map `xxTrustedFormCertUrl` onto the buyer's cert-URL field in the LeadProsper map; the dashboard lists it and auto-matches the usual LP names.
-- **Field-name conventions — ALWAYS snake_case, lowercase, underscore-separated:** `first_name`, `last_name`, `email`, `phone`, `mortgage_balance`, `zip_code`. NEVER `firstName`, `MortgageBalance`, `First Name`, or `Province`. **CRITICAL (server-enforced): the four contact fields are always exactly `first_name` / `last_name` / `email` / `phone`, and a name already used on any variant of the funnel is never respelled — read `get_form_destinations(funnel_id).formFields` first and reuse those names verbatim; the write is refused otherwise.** Use the SAME snake_case name across **every variant** of a funnel — inconsistent casing creates duplicate columns in form handlers (e.g. Formspree) and breaks integration field maps (e.g. LeadProsper, whose mapping keys are snake_case, so a `Province` input never matches the `province` mapping and the lead arrives empty). These names also feed the qualification-rule UI's field-name autocomplete (it parses your variant HTML; submissions aren't stored). The platform force-normalizes field names to snake_case at submit time as a safety net, but author them correctly — don't rely on the guard. Names beginning with `_` (`_next`, `_subject`, `_gotcha`) are control fields and provide through untouched.
+- **`submitted_at` is added for you.** At submit, publish stamps a hidden `submitted_at` input with the moment the form was sent, so every destination (native POST, fan-out mirrors, the broker, the CRM adapters) receives it. The format (ISO 8601 UTC by default; local ISO, `YYYY-MM-DD HH:mm:ss` UTC, US local, Unix seconds, or off) is a funnel setting under Conversion, next to the phone format. Don't author your own `submitted_at` field; map it at the destination if the CRM needs a named property (LeadProsper field maps must include it explicitly). Same for TrustedForm: when it is on, the snippet appends `xxTrustedFormCertUrl` (plus `xxTrustedFormPingUrl` / `xxTrustedFormCertToken`) to the form at capture time — map `xxTrustedFormCertUrl` onto the buyer's cert-URL field in the LeadProsper map; the dashboard lists it and auto-matches the usual LP names. A submit that lands before the cert exists is held up to 2 s for it (never longer — a lead is never dropped over a cert), and every lead row records whether a cert was attached: the Lead capture tab flags **No TrustedForm cert** on leads whose browser blocked the script, and the workspace banner warns when a funnel's share of those passes one in ten.
+- **Field-name conventions — ALWAYS snake_case, lowercase, underscore-separated:** `first_name`, `last_name`, `email`, `phone`, `mortgage_balance`, `zip_code`. NEVER `firstName`, `MortgageBalance`, `First Name`, or `Province`. **CRITICAL (server-enforced): the four contact fields are always exactly `first_name` / `last_name` / `email` / `phone`, and a name already used on any variant of the funnel is never respelled — read `get_form_destinations(funnel_id).formFields` first and reuse those names verbatim; the write is refused otherwise.** Use the SAME snake*case name across **every variant** of a funnel — inconsistent casing creates duplicate columns in form handlers (e.g. Formspree) and breaks integration field maps (e.g. LeadProsper, whose mapping keys are snake_case, so a `Province` input never matches the `province` mapping and the lead arrives empty). These names also feed the qualification-rule UI's field-name autocomplete (it parses your variant HTML; submissions aren't stored). The platform force-normalizes field names to snake_case at submit time as a safety net, but author them correctly — don't rely on the guard. Names beginning with `*` (`\_next`, `\_subject`, `\_gotcha`) are control fields and provide through untouched.
 
 ### B) `destinations: [...]` — integration(s) connected
 
@@ -98,6 +98,33 @@ submitStrategy === "leadprosper" — LeadProsper ping-post. Granvl bakes the
                                     enabled, so it CAN'T be the native form
                                     action. You don't write the handler — just
                                     the form, with the right field NAMES.
+
+submitStrategy === "leaddistro"   — Lead Distro AI (leaddistro.ai) ping-post.
+                                    Same shape as leadprosper: write an
+                                    ORDINARY <form>; the baked adapter remaps
+                                    fields (per the saved map, else pass-
+                                    through by name), attaches flo_campaign_id
+                                    / flo_supplier_id, and fires a CORS
+                                    keepalive POST to /api/v1/ingest with the
+                                    x-api-key header (a native form POST can't
+                                    send headers → 401), then redirects to
+                                    _next. The verdict (ACCEPTED / UNMATCHED /
+                                    DUPLICATE) is readable and lands in the
+                                    lead table. Field names are snake_case:
+                                    first_name, last_name, phone, email, state,
+                                    zip_code + the campaign's custom fields.
+submitStrategy === "klaviyo"      — Klaviyo list subscription (ecommerce
+                                    newsletter / waitlist / quiz email capture).
+                                    Write an ORDINARY <form>; the baked adapter
+                                    builds Klaviyo's JSON:API client-subscription
+                                    body (email / phone / first_name / last_name
+                                    onto the profile, every other input as a
+                                    profile property, the list from the saved
+                                    list_id) and POSTs it browser → Klaviyo with
+                                    the public key in the query (CORS; 202 =
+                                    delivered), then redirects to _next. Email
+                                    consent is SUBSCRIBED on submit; SMS only
+                                    when a `sms_consent` checkbox is checked.
 ```
 
 **Provider-specific addenda:**
@@ -116,7 +143,11 @@ submitStrategy === "leadprosper" — LeadProsper ping-post. Granvl bakes the
 
 - **`provider === "LEADPROSPER"`** — LeadProsper (lead-distribution / ping-post) is normally set up in the **dashboard**: the user connects a LeadProsper dev API key once (funnel → Integrations tab), then picks a **campaign → supplier** and maps form fields to LeadProsper field names. You usually don't set this up — but `set_form_destination` **does** accept a LeadProsper **"Get API Specs"** curl/JSON sample (it carries `lp_campaign_id` + `lp_supplier_id` + `lp_key`). If only the API key is captured, the tool returns `meta.requiresSetup: true` + `meta.missing[]`; ask the user to paste that API-specs sample to finish. Once connected, just write a normal `<form>` — the `leadprosper` adapter (above) does the rest. **When LeadProsper was connected through `set_form_destination` there is no field map**: every input is posted under its own name, so the input names in the HTML must be LeadProsper's exact field names (a dashboard-built map is the only way to post under different names). Two hard rules: **field names are case-sensitive** (`FirstName`, `LastName`, `Email`, `Phone`, …) and **`FirstName` + `LastName` are REQUIRED as separate inputs** (never a single `name`). Check the campaign spec for the exact required field set before generating the form; a missing/misnamed field is silently rejected by LeadProsper.
 
-**Phone formatting — all destinations (don't hand-roll it).** The funnel's **Integrations tab** carries one phone-format setting (E.164 / 10-digit / `(650) 327-1100` / `650-327-1100`) that Granvl applies to the phone field at serve time for *every* destination. Just collect `<input type="tel" name="phone">` — the bake reformats the value before submit. Don't normalize phone numbers in your own form JS. If a destination rejects the phone format (e.g. LeadProsper rejects E.164 `+1…` and wants US-formatted), tell the user to switch this setting rather than editing HTML.
+- **`provider === "LEADDISTRO"`** — Lead Distro AI (lead distribution / ping-post). Setup needs three values from the source's **Inbound API Specs** page in Lead Distro: `flo_campaign_id`, `flo_supplier_id`, `x-api-key`. Either paste that page's curl sample (or its URL plus the key) into `set_form_destination`, or call `set_leaddistro_destination` with the three values (+ an optional field map and `test_lead: true` while verifying). If anything is missing the response says `meta.requiresSetup` + `meta.missing[]` — ask the user for it. Then write a normal `<form>` with Lead Distro's **snake_case** field names (`first_name`, `last_name`, `phone`, `email`; optional `state` as a 2-letter code, `zip_code`; custom fields as named in the campaign). **`first_name` + `last_name` are required** — a lone `name` input is split at submit, but separate inputs are safer. Phone is best sent as 10 digits (`DIGITS10` in the Integrations tab).
+
+**State / province dropdowns — the funnel decides what is sent (don't hand-roll it).** Author `<select name="state">` with the full names as labels (`<option>Alabama</option>`) and no values. The funnel's **Integrations tab** carries a **State format** setting that Granvl applies at serve time for every destination: two-letter code (`AL`, the default — LeadProsper and most CRMs reject the spelled-out name), full name, or as authored. A `value` you set yourself that is neither the label nor a postal code is kept. If a destination wants the other form, tell the user to switch the setting rather than editing HTML.
+
+**Phone formatting — all destinations (don't hand-roll it).** The funnel's **Integrations tab** carries one phone-format setting (E.164 / E.164 without the `+` / 10-digit / `(650) 327-1100` / `650-327-1100` / more) that Granvl applies to the phone field at serve time for *every* destination. Just collect `<input type="tel" name="phone">` — the bake reformats the value before submit. Don't normalize phone numbers in your own form JS. If a destination rejects the phone format (e.g. LeadProsper rejects E.164 `+1…` and wants US-formatted), tell the user to switch this setting rather than editing HTML.
 
 **Serve-contract selectors — the bake keys its injections off these exact shapes; a miss fails silently:**
 
@@ -135,13 +166,13 @@ Forms that look right but don't enforce required fields are one of the highest-f
 
 ### Default to required for these fields
 
-| Field | Required? | Why |
-|---|---|---|
-| `email` | Always | Primary lead identifier; without it the destination has nothing to ingest. |
-| `phone` | When captured | Required when the form collects phone OR when SMS OTP is enabled. |
-| `name` / `first_name` / `full_name` | Usually | Skip only on anonymous lead forms (rare; flag to user before omitting). |
-| Quiz question inputs that gate progression | Always | Without an answer the funnel can't decide qualification. |
-| Privacy/terms consent checkbox | When contact info is captured AND legal URLs exist | Ad-platform compliance + GDPR. Pattern A below. No legal URLs yet (first build / preview)? Skip it — add it once the URLs land, before paid traffic. |
+| Field                                      | Required?                                          | Why                                                                                                                                                  |
+| ------------------------------------------ | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `email`                                    | Always                                             | Primary lead identifier; without it the destination has nothing to ingest.                                                                           |
+| `phone`                                    | When captured                                      | Required when the form collects phone OR when SMS OTP is enabled.                                                                                    |
+| `name` / `first_name` / `full_name`        | Usually                                            | Skip only on anonymous lead forms (rare; flag to user before omitting).                                                                              |
+| Quiz question inputs that gate progression | Always                                             | Without an answer the funnel can't decide qualification.                                                                                             |
+| Privacy/terms consent checkbox             | When contact info is captured AND legal URLs exist | Ad-platform compliance + GDPR. Pattern A below. No legal URLs yet (first build / preview)? Skip it — add it once the URLs land, before paid traffic. |
 
 **Skip required for these:**
 
@@ -155,7 +186,7 @@ Forms that look right but don't enforce required fields are one of the highest-f
 
 ```html
 <label class="gv-consent">
-  <input type="checkbox" name="consent_privacy" required>
+  <input type="checkbox" name="consent_privacy" required />
   <span>
     I agree to the
     <a href="{privacyPolicyUrl}" target="_blank" rel="noopener">Privacy Policy</a>
@@ -171,11 +202,10 @@ Use the workspace's actual `privacyPolicyUrl` / `termsOfServiceUrl` from `get_fu
 
 ```html
 <label class="gv-consent">
-  <input type="checkbox" name="consent_sms" required>
+  <input type="checkbox" name="consent_sms" required />
   <span>
-    By providing my phone number I agree to receive marketing text messages
-    from {businessLegalName} at the number provided. Message and data rates
-    may apply. Reply STOP to opt out.
+    By providing my phone number I agree to receive marketing text messages from {businessLegalName}
+    at the number provided. Message and data rates may apply. Reply STOP to opt out.
   </span>
 </label>
 ```
@@ -229,23 +259,25 @@ The action attribute is the load-bearing field. The trigger is just provenance �
 
 **What fires automatically:**
 
-| Visitor action | What fires (and on whose variant) |
-|---|---|
-| Submits any form (any destination, including external CRMs) | `CONVERSION + action=form_submit` on the **source variant**. Fired client-side by the inlined submit listener at the moment of submit, before browser navigation. Survives navigation via `sendBeacon`. |
-| Submits form → arrives on Granvl TY page (the `_cv` redirect chain still works) | `CONVERSION + action=form_submit + trigger=ty_page_fallback` on the **source variant**. Deduped against any earlier client-side fire by the same visitor on the same funnel within 24h — only one row lands. Belt-and-suspenders for funnels where the chain works. |
-| Clicks internal link from LANDING → QUIZ | `CLICK_THROUGH` event (separate event type for intra-funnel navigation — NOT a conversion). The serve-side script auto-rewrites internal links to carry `_cv`. |
-| Clicks `data-pages-convert` outbound link from any page | `CONVERSION + action=click_through` on the **page where the click happened**. THANK_YOU pages use this for "post-arrival outbound engagement" (e.g. book-a-call buttons). |
-| Books a meeting inside an embedded Calendly/Cal.com/HubSpot/Acuity/SavvyCal/TidyCal iframe | `CONVERSION + action=embedded_widget + metadata.provider=<provider>` on the **page hosting the embed**. ONLY fires when the variant has `embedded_widget` set — see §2c below. |
+| Visitor action                                                                             | What fires (and on whose variant)                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Submits any form (any destination, including external CRMs)                                | `CONVERSION + action=form_submit` on the **source variant**. Fired client-side by the inlined submit listener at the moment of submit, before browser navigation. Survives navigation via `sendBeacon`.                                                             |
+| Submits form → arrives on Granvl TY page (the `_cv` redirect chain still works)            | `CONVERSION + action=form_submit + trigger=ty_page_fallback` on the **source variant**. Deduped against any earlier client-side fire by the same visitor on the same funnel within 24h — only one row lands. Belt-and-suspenders for funnels where the chain works. |
+| Clicks internal link from LANDING → QUIZ                                                   | `CLICK_THROUGH` event (separate event type for intra-funnel navigation — NOT a conversion). The serve-side script auto-rewrites internal links to carry `_cv`.                                                                                                      |
+| Clicks `data-pages-convert` outbound link from any page                                    | `CONVERSION + action=click_through` on the **page where the click happened**. THANK_YOU pages use this for "post-arrival outbound engagement" (e.g. book-a-call buttons).                                                                                           |
+| Books a meeting inside an embedded Calendly/Cal.com/HubSpot/Acuity/SavvyCal/TidyCal iframe | `CONVERSION + action=embedded_widget + metadata.provider=<provider>` on the **page hosting the embed**. ONLY fires when the variant has `embedded_widget` set — see §2c below.                                                                                      |
 
 **Dedup is action-keyed**: a visitor doing both a form-submit and a click-through on the same funnel within 24h counts as two distinct conversions, not one. `embedded_widget` is its own action and dedupes independently.
 
 The injected `window.pagesTrack` is available for custom interactions (video-watched, scroll-50%) — `window.pagesTrack('CONVERSION', { metadata })`. Don't load any third-party tracker. GTM and Meta CAPI flow through the user's configured `Domain` settings server-side.
 
 **When to add `data-pages-convert` manually:**
+
 - External outbound links that should count as conversions (Calendly, Stripe, app-store)
 - Outbound CTAs on THANK_YOU pages (post-conversion follow-through)
 
 **When NOT to add it:**
+
 - Internal links between funnel pages (the serve route auto-attributes via `_cv`)
 - Form submit buttons (form-submit listener handles attribution)
 - Anchor links that scroll within the same page
@@ -255,8 +287,9 @@ The injected `window.pagesTrack` is available for custom interactions (video-wat
 For a quiz / multi-step funnel on **one HTML page**, Granvl auto-tracks per-question drop-off for you — **you write zero tracking JS and you maintain no "current step" state.** You only tell Granvl where one question ends and the next begins.
 
 **The whole contract:** wrap each question (and the intro / "Get started" screen, if any) in its own element carrying `data-step="N"` — 1-indexed, in order (an intro can be `data-step="0"`). Optionally:
-   - `data-step-name="..."` — chart label (e.g. `"Budget"`). If omitted, Granvl falls back to the section's first heading text.
-   - `data-step-kind="..."` — one of `"question" | "form" | "intro" | "review"`.
+
+- `data-step-name="..."` — chart label (e.g. `"Budget"`). If omitted, Granvl falls back to the section's first heading text.
+- `data-step-kind="..."` — one of `"question" | "form" | "intro" | "review"`.
 
 That's it — no `data-current-step`, no `data-step-total`, no event-firing JS. Granvl's injected observer watches for an **answer inside a `data-step` element** — a click on a button/option **or** a `change`/`input` on a field — and fires the step events for you:
 
@@ -264,13 +297,13 @@ That's it — no `data-current-step`, no `data-step-total`, no event-firing JS. 
 - `STEP_COMPLETE` for the previous question (with `timeOnStep` in ms) as they advance.
 - A final `STEP_COMPLETE` with `metadata.abandoned: true` on `beforeunload` if they bail mid-quiz — that's where the drop-off chart shows the funnel hemorrhaging.
 
-Because it keys on *answers*, it works the same whether your quiz shows one question at a time or all at once, and whether questions are answered by **buttons** (button-advance quizzes) or **inputs** (selects, radios, text). How you hide inactive steps is irrelevant to tracking.
+Because it keys on _answers_, it works the same whether your quiz shows one question at a time or all at once, and whether questions are answered by **buttons** (button-advance quizzes) or **inputs** (selects, radios, text). How you hide inactive steps is irrelevant to tracking.
 
 > **Forms** (a plain multi-field form, no `data-step` sections) need **nothing at all** — Granvl auto-tracks field-by-field engagement (which field they reached, where they stalled), skipping hidden + tracking fields (`utm_*`, `gclid`, …).
 >
 > **Legacy:** if you instead put `data-current-step="N"` on a wrapper and update it as the visitor advances, Granvl uses an older explicit observer keyed on that attribute. Still supported, but you don't need it — prefer plain `data-step`.
 
-**Form wiring still applies — the whole quiz IS a form.** Single-page quizzes wrap every step in one `<form>` element. That means §1's form-wiring rules apply *to the quiz itself*: the form needs an `_next` redirect, follows the destination-or-bare-form pattern, and gets its `action` + `method` rewritten by the serve route. Skipping `_next` is the #1 cause of "the quiz reloaded back to step 1 after submit" reports — the form posts successfully but the response page has no redirect, the browser does its default thing, and the page re-renders at step 1.
+**Form wiring still applies — the whole quiz IS a form.** Single-page quizzes wrap every step in one `<form>` element. That means §1's form-wiring rules apply _to the quiz itself_: the form needs an `_next` redirect, follows the destination-or-bare-form pattern, and gets its `action` + `method` rewritten by the serve route. Skipping `_next` is the #1 cause of "the quiz reloaded back to step 1 after submit" reports — the form posts successfully but the response page has no redirect, the browser does its default thing, and the page re-renders at step 1.
 
 **Common pitfalls (read before scaffolding):**
 
@@ -278,7 +311,7 @@ Because it keys on *answers*, it works the same whether your quiz shows one ques
 2. **Forgot `type="button"` on Next buttons →** buttons inside `<form>` default to `type="submit"`. Clicking "Next" on step 1 submits the whole quiz immediately. Every navigation button MUST be `type="button"`; only the final "Submit" button can be `type="submit"` (or default).
 3. **Wrapped the JS submit handler with `e.preventDefault()` + nothing else →** the form never actually submits. Don't do this; let the form submit natively. The serve route handles attribution + the destination handles the redirect.
 4. **Steps outside the form →** if `<section data-step="3">` is OUTSIDE the `<form>`, that step's inputs never make it into the submission. Every step `<section>` must be a child of the `<form>`.
-5. **Enter key submitting the quiz early →** pressing Enter in a single-line `<input>` fires the browser's *implicit* form submit — historically this jumped the quiz forward or submitted the contact step before it was filled. **The platform now auto-guards this at serve time**: Enter advances to the next *visible* field, and on the last visible field clicks the step's primary button. So **you don't write an Enter handler.** Two structural things keep the guard correct: hide non-current steps with `display:none` (their fields are then skipped — see the scaffold), and keep Next as `type="button"` (pitfall #2) so the button it clicks is "Next," not a stray submit. If you *do* add your own Enter handling, call `e.preventDefault()` in it and the platform guard stands down (it only acts when nothing else handled the key).
+5. **Enter key submitting the quiz early →** pressing Enter in a single-line `<input>` fires the browser's _implicit_ form submit — historically this jumped the quiz forward or submitted the contact step before it was filled. **The platform now auto-guards this at serve time**: Enter advances to the next _visible_ field, and on the last visible field clicks the step's primary button. So **you don't write an Enter handler.** Two structural things keep the guard correct: hide non-current steps with `display:none` (their fields are then skipped — see the scaffold), and keep Next as `type="button"` (pitfall #2) so the button it clicks is "Next," not a stray submit. If you _do_ add your own Enter handling, call `e.preventDefault()` in it and the platform guard stands down (it only acts when nothing else handled the key).
 
 **Minimal scaffold (bare-form path — `destination === null`):**
 
@@ -287,10 +320,11 @@ Because it keys on *answers*, it works the same whether your quiz shows one ques
   <!-- _next is critical. Without it the post-submit redirect doesn't
        fire and the page appears to "reload back to step 1". The
        {{THANK_YOU_URL}} token gets substituted by the serve route. -->
-  <input type="hidden" name="_next" value="{{THANK_YOU_URL}}">
+  <input type="hidden" name="_next" value="{{THANK_YOU_URL}}" />
 
   <section data-step="1" data-step-name="Budget" data-step-kind="question">
-    <label>What's your budget?
+    <label
+      >What's your budget?
       <select name="budget">
         <option value="under_5k">Under $5K</option>
         <option value="5k_25k">$5K–$25K</option>
@@ -302,7 +336,8 @@ Because it keys on *answers*, it works the same whether your quiz shows one ques
   </section>
 
   <section data-step="2" data-step-name="Timeline" data-step-kind="question" hidden>
-    <label>When are you starting?
+    <label
+      >When are you starting?
       <select name="timeline">
         <option value="now">Right away</option>
         <option value="3_months">Next 3 months</option>
@@ -312,10 +347,13 @@ Because it keys on *answers*, it works the same whether your quiz shows one ques
   </section>
 
   <section data-step="3" data-step-name="Contact" data-step-kind="form" hidden>
-    <input type="email" name="email" required>
+    <input type="email" name="email" required />
     <label class="gv-consent">
-      <input type="checkbox" name="consent_privacy" required>
-      <span>I agree to the <a href="{privacyPolicyUrl}" target="_blank" rel="noopener">Privacy Policy</a>.</span>
+      <input type="checkbox" name="consent_privacy" required />
+      <span
+        >I agree to the
+        <a href="{privacyPolicyUrl}" target="_blank" rel="noopener">Privacy Policy</a>.</span
+      >
     </label>
     <!-- Final step: type="submit" (or omit, since this is the only
          submit-defaulting button in the form). DO NOT add onsubmit
@@ -329,9 +367,9 @@ Because it keys on *answers*, it works the same whether your quiz shows one ques
     // tracking events or set data-current-step — Granvl detects the answer
     // inside each data-step section and fires the step events for you.
     function advanceTo(n) {
-      document.querySelectorAll('#quiz [data-step]').forEach(function(s) {
-        s.hidden = String(s.dataset.step) !== String(n);
-      });
+      document.querySelectorAll('#quiz [data-step]').forEach(function (s) {
+        s.hidden = String(s.dataset.step) !== String(n)
+      })
     }
   </script>
 </form>
@@ -341,7 +379,7 @@ That's the whole contract. The auto-injected script handles all step-event firin
 
 **With a configured destination (`destination !== null`):** exactly the same bare form — no `action`, no `method`, no vendor hidden fields. §1 option B applies to the quiz form unchanged: granvl bakes the destination's adapter, fan-out, and hidden fields at serve time; you control the field names (matching what the destination expects) and the `_next={{THANK_YOU_URL}}` input. The `data-step` grouping attributes are independent of destination wiring — they always work the same.
 
-**Privacy.** Step events capture *that* the visitor reached/left a step and how long they spent, never *what they answered*. Same zero-PII guarantee as the rest of Granvl.
+**Privacy.** Step events capture _that_ the visitor reached/left a step and how long they spent, never _what they answered_. Same zero-PII guarantee as the rest of Granvl.
 
 **❌ DO NOT split a quiz across multiple Granvl pages.** A funnel can have at most ONE `Page.type === 'QUIZ'`. The MCP `create_page` and `update_page` calls REJECT any operation that would result in 2+ QUIZ pages in a funnel, and publish blocks until the shape is fixed. Multi-page quizzes (LANDING → QUIZ → QUIZ → QUIZ → THANK_YOU) are an antipattern: page navigation between steps hemorrhages visitors, prevents inline validation, and produces worse conversion math than a single-page quiz. **Every multi-step quiz lives on ONE QUIZ page with `<section data-step>` swaps** — that's the contract.
 
@@ -349,23 +387,24 @@ A legitimate adjacent pattern: LANDING with a "Take the quiz" CTA → QUIZ page 
 
 ## 2c. Embedded booking widgets (Calendly / Cal.com / HubSpot / Acuity / SavvyCal / TidyCal)
 
-When the user wants to embed a third-party scheduling tool in a variant (*"add my Calendly here"*, *"drop in a Cal.com embed"*, *"embed our HubSpot meeting link"*, etc.), the booking happens **inside the iframe** and Granvl's normal conversion paths see nothing. The funnel reports 0% conversion while the customer's calendar fills up.
+When the user wants to embed a third-party scheduling tool in a variant (_"add my Calendly here"_, _"drop in a Cal.com embed"_, _"embed our HubSpot meeting link"_, etc.), the booking happens **inside the iframe** and Granvl's normal conversion paths see nothing. The funnel reports 0% conversion while the customer's calendar fills up.
 
 **Fix: set `embedded_widget` on the variant** when calling `create_variant` / `update_variant` / `bulk_create_variants`. Granvl then auto-injects a postMessage listener scoped to the widget's origin and fires `CONVERSION + action=embedded_widget` on a successful booking.
 
 Supported values:
 
-| Trigger phrase from the user | `embedded_widget` value |
-|---|---|
-| "Calendly", "embed my calendar from Calendly" | `calendly` |
-| "Cal.com", "cal.com booking link" | `cal_com` |
-| "HubSpot meetings", "HubSpot calendar embed" | `hubspot_meetings` |
-| "Acuity", "Acuity scheduling" | `acuity` |
-| "SavvyCal" | `savvycal` |
-| "TidyCal" | `tidycal` |
+| Trigger phrase from the user                                    | `embedded_widget` value             |
+| --------------------------------------------------------------- | ----------------------------------- |
+| "Calendly", "embed my calendar from Calendly"                   | `calendly`                          |
+| "Cal.com", "cal.com booking link"                               | `cal_com`                           |
+| "HubSpot meetings", "HubSpot calendar embed"                    | `hubspot_meetings`                  |
+| "Acuity", "Acuity scheduling"                                   | `acuity`                            |
+| "SavvyCal"                                                      | `savvycal`                          |
+| "TidyCal"                                                       | `tidycal`                           |
 | Anything else — different provider, internal booking tool, etc. | `custom` + `embedded_widget_config` |
 
 For `custom`, also provide `embedded_widget_config`:
+
 ```ts
 {
   embedded_widget: 'custom',
@@ -380,16 +419,18 @@ For `custom`, also provide `embedded_widget_config`:
 
 ```html
 <!-- Inside the variant HTML -->
-<div class="calendly-inline-widget"
-     data-url="https://calendly.com/acme/intro"
-     style="min-width:320px;height:700px;"></div>
-<script src="https://assets.calendly.com/assets/external/widget.js"
-        async></script>
+<div
+  class="calendly-inline-widget"
+  data-url="https://calendly.com/acme/intro"
+  style="min-width:320px;height:700px;"
+></div>
+<script src="https://assets.calendly.com/assets/external/widget.js" async></script>
 ```
 
 …paired with `embedded_widget: 'calendly'` in the MCP call. Granvl's injected listener does the rest.
 
 **When NOT to set it:**
+
 - The CTA is a link to a hosted Calendly page (the user clicks and gets navigated OFF the variant). Use `data-pages-convert` on that link instead — it's an outbound click, not an embed.
 - The "embed" is actually a redirect-mode booking flow (visitor leaves the variant during booking). Use a Granvl TY page + the `_cv` chain instead.
 
@@ -398,17 +439,23 @@ For `custom`, also provide `embedded_widget_config`:
 Same iframe blind spot as 2c, but for **lead-capture forms** instead of booking widgets. The form lives in a cross-origin iframe, so Granvl's `submit` listener never sees the submission and the vendor's post-submit redirect can't carry the `_cv` marker. By default the funnel reports 0 conversions even though leads are coming in.
 
 **Fix (two steps):**
-1. In the **vendor's** settings, set the form's *on-submit redirect* to the funnel's thank-you page URL (the `{{THANK_YOU_URL}}` value, or the page's published URL). Redirecting the top window OR within the iframe both work — as long as it lands on the Granvl TY page so our tracker beacons a VIEW.
+
+1. In the **vendor's** settings, set the form's _on-submit redirect_ to the funnel's thank-you page URL (the `{{THANK_YOU_URL}}` value, or the page's published URL). Redirecting the top window OR within the iframe both work — as long as it lands on the Granvl TY page so our tracker beacons a VIEW.
 2. Call `update_funnel` with `thank_you_view_conversion: true`. Granvl then counts the visitor's arrival on the TY page as a `CONVERSION` (action `form_submit`), attributed to the embed-hosting page. Same 24h dedup as native submits — never double-counts.
 
 ```html
 <!-- Inside the LANDING variant HTML — embed the form normally -->
-<iframe src="https://form.typeform.com/to/XXXXXX"
-        style="width:100%;height:600px;border:0;" title="Apply"></iframe>
+<iframe
+  src="https://form.typeform.com/to/XXXXXX"
+  style="width:100%;height:600px;border:0;"
+  title="Apply"
+></iframe>
 ```
+
 …paired with `update_funnel({ funnel_id, thank_you_view_conversion: true })` and the vendor's redirect pointed at the TY page.
 
 **When NOT to set it:**
+
 - The form is a **native** `<form>` Granvl generated (§1) — already tracked at submit; leave the flag off.
 - The embed shows an **inline** "thanks" with no navigation to a Granvl TY page — there's no arrival to count. Either switch the vendor to redirect-to-TY, or (for booking-style widgets) use the `embedded_widget` postMessage path in §2c.
 
@@ -453,14 +500,14 @@ If any of those three patterns lands in a saved variant, the `create_variant` / 
 
 ## 3b. Brand kit — the brand the customer builds with
 
-A **brand kit** is a workspace-level *brand* — name, colors, fonts, radius, **logo**, **voice/tone**, and tagline — attached to one or more domains. It's **reference data only**: Granvl injects nothing at serve time. You read the kit, then bake the actual hex codes, font links, radius, logo, and tone directly into the variant HTML at generate time. A saved variant is fully self-contained — what you save is exactly what renders.
+A **brand kit** is a workspace-level _brand_ — name, colors, fonts, radius, **logo**, **voice/tone**, and tagline — attached to one or more domains. It's **reference data only**: Granvl injects nothing at serve time. You read the kit, then bake the actual hex codes, font links, radius, logo, and tone directly into the variant HTML at generate time. A saved variant is fully self-contained — what you save is exactly what renders.
 
-**YOU OWN BRAND CONSISTENCY — BE PROACTIVE.** Granvl is agent-operated; filling out and maintaining the brand kit is *your* job, not a thing to wait for the user to ask about. The moment you start working on a domain:
+**YOU OWN BRAND CONSISTENCY — BE PROACTIVE.** Granvl is agent-operated; filling out and maintaining the brand kit is _your_ job, not a thing to wait for the user to ask about. The moment you start working on a domain:
 
 1. Call `get_brand_kit(domain_id)` (or read `brand` from `get_funnel`).
 2. **Check for an auto-extracted kit first.** During onboarding Granvl can scrape the user's website into a kit — if `sourceUrl` is set, the palette, logo, and fonts came from their real site. Trust it as the starting point (confirm, don't re-interview), and use `screenshots[]` — hosted captures of that site — as your look-and-feel reference when generating pages. A kit created seconds ago may still be a stub while extraction finishes; re-read it before declaring it empty.
 3. **If it's genuinely empty or thin, build it out before generating pages.** Ask the user for their brand (or offer to pull it from their existing website / a brand doc / their logo), then SAVE it with `update_brand_kit` — colors, fonts, radius, `logo_url`, and especially `voice`. A good brand kit is the single biggest lever on output quality — the same campaign looks weak without brand assets and shippable with them. (Users can also view and edit kits themselves in **Settings → Brand Kits** — point them there if they want to tweak colors or the logo by hand.)
-4. Once saved, every page you generate is automatically on-brand — and so is your *copy*, because you write in the kit's `voice`.
+4. Once saved, every page you generate is automatically on-brand — and so is your _copy_, because you write in the kit's `voice`.
 
 **Logo:** upload it with the `upload_image` tool first (gets a hosted Granvl URL), then provide that URL as `update_brand_kit(logo_url: ...)`. Use the logo in the variant header/footer.
 
@@ -491,9 +538,7 @@ A **brand kit** is a workspace-level *brand* — name, colors, fonts, radius, **
 
 ```html
 <!-- Colors: bake the hex -->
-<button class="bg-[#1d3557] hover:bg-[#16263f] text-white px-6 py-3 rounded-lg">
-  Get Started
-</button>
+<button class="rounded-lg bg-[#1d3557] px-6 py-3 text-white hover:bg-[#16263f]">Get Started</button>
 
 <!-- Fonts — STRONG DEFAULT: the system stack, no webfont at all.
      `system-ui, -apple-system, sans-serif` is zero bytes, renders
@@ -509,20 +554,34 @@ A **brand kit** is a workspace-level *brand* — name, colors, fonts, radius, **
      auto-rewrites bare font stylesheets to this pattern at serve time,
      so a miss isn't fatal — but author it right. -->
 <head>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style"
-        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600;700&display=swap"
-        onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="preload"
+    as="style"
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600;700&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'"
+  />
   <noscript>
-    <link rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600;700&display=swap">
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600;700&display=swap"
+    />
   </noscript>
   <style>
     /* Body on the system stack; the brand webfont only where it earns
        its bytes. */
-    body { font-family: system-ui, -apple-system, sans-serif; }
-    h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; }
+    body {
+      font-family:
+        system-ui,
+        -apple-system,
+        sans-serif;
+    }
+    h1,
+    h2,
+    h3 {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
   </style>
 </head>
 ```
@@ -538,18 +597,21 @@ A **brand kit** is a workspace-level *brand* — name, colors, fonts, radius, **
 **Two modes, very different behavior:**
 
 **Flexible mode (`brand.brandMode === false`, default):**
+
 - Use the brand kit as a strong default for brand-related styling — colors, fonts, radius.
 - If the user gives an explicit override ("make the CTA red", "use Roboto for headlines"), follow the override.
 - The brand kit is a default, not a hard rule.
 
 **Brand Mode (`brand.brandMode === true`):**
+
 - The user has locked the brand. **Every variant MUST use the brand palette and fonts.**
 - If the user asks for a color or font that conflicts with brand mode, surface this:
-  > *"Brand Mode is on for this brand — I have to use your brand colors / fonts. Want me to turn Brand Mode off first? You can also toggle it in dashboard → Brand Kits."*
+  > _"Brand Mode is on for this brand — I have to use your brand colors / fonts. Want me to turn Brand Mode off first? You can also toggle it in dashboard → Brand Kits."_
 - Only call `update_brand_kit(domain_id, brand_mode: false)` on explicit confirmation.
 
 **When the brand kit changes.** Since the values are baked into variants, an update to the brand kit doesn't auto-propagate. If the customer changes a color or font, offer to re-skin existing variants:
-> *"You updated the brand kit. Want me to re-generate the existing variants to use the new palette?"*
+
+> _"You updated the brand kit. Want me to re-generate the existing variants to use the new palette?"_
 
 **Writing the brand kit.** Save brand info as you learn it — proactively, not only when handed a spec. `update_brand_kit` takes `domain_id` plus any of `tokens`, `name`, `logo_url`, `voice`, `tagline`, `brand_mode` (provide only what you're changing):
 
@@ -584,8 +646,8 @@ Pasted code (v0.dev / shadcn) with off-brand colors should be edited to the bran
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ page title }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
@@ -604,7 +666,7 @@ The serve route injects the tracking script before `</body>` and (if configured)
 **Hero image — set `fetchpriority="high"`:** when the variant has a hero image (an `<img>` above the fold, typically the first one in the document), set `fetchpriority="high"` on it. The serve route's image optimizer also auto-detects the first `<img>` and exempts it from lazy-loading + adds `fetchpriority="high"` if you forget — but setting it explicitly is the right contract:
 
 ```html
-<img src="/hero.jpg" alt="..." fetchpriority="high" width="800" height="450">
+<img src="/hero.jpg" alt="..." fetchpriority="high" width="800" height="450" />
 ```
 
 Why: the hero is almost always the LCP element. Without `fetchpriority="high"` (and without auto-exempting it from lazy), the browser deprioritizes the fetch and Lighthouse can fail to even measure LCP. This single attribute is the cheapest 1-2s LCP win available.
@@ -700,6 +762,7 @@ After compression, the total page weight should land under **1.5 MB** including 
 **Self-check before publish:**
 
 After generating a variant, run this mental check:
+
 - [ ] No `background-image: url(...)` used for a gradient (use CSS `bg-gradient-to-*` instead)?
 - [ ] Fonts use the preload pattern from §3b, with ≤3 weights per family?
 - [ ] No third-party analytics SDKs beyond what's in the brand kit / domain tracking config?
@@ -726,7 +789,7 @@ When the workspace has legal URLs set, every variant includes a footer linking t
 }
 ```
 
-- `privacyPolicyUrl` set → link it in the footer. Null → **build anyway, skip the footer links**, and NEVER substitute a placeholder URL (`#`, `/privacy`, `https://example.com/privacy`). When the user wants to publish on a custom domain or run ads, say: *"Before this goes live on your domain, add your Privacy Policy URL in Settings → Domains → [domain] → Legal & compliance. Ad platforms reject landing pages that don't link one."*
+- `privacyPolicyUrl` set → link it in the footer. Null → **build anyway, skip the footer links**, and NEVER substitute a placeholder URL (`#`, `/privacy`, `https://example.com/privacy`). When the user wants to publish on a custom domain or run ads, say: _"Before this goes live on your domain, add your Privacy Policy URL in Settings → Domains → [domain] → Legal & compliance. Ad platforms reject landing pages that don't link one."_
 - `termsOfServiceUrl` is recommended; render the link only if set.
 - `businessLegalName` drives the `© {year} {name}` line; render the line only if set.
 
@@ -754,30 +817,31 @@ If `warnings` is empty, the funnel is live and you're done — tell the user the
 
 **Auto-fix codes (informational — already applied to saved HTML):**
 
-| Code | What the validator did | Why it matters |
-|---|---|---|
-| `form_action_stripped` | Removed `action="..."` from `<form>` | Serve route auto-routes to `/api/form-submit`; an existing action would conflict |
-| `form_method_stripped` | Removed `method="..."` from `<form>` | Same |
-| `formspree_url_stripped` | Replaced a third-party form host (formspree, getform, etc.) | Form data must flow through Granvl to track conversions |
-| `next_field_injected` | Added `<input name="_next" value="{{THANK_YOU_URL}}">` on LANDING/FORM | Without it the visitor doesn't redirect to thank-you (no auto-conversion) |
-| `hardcoded_ty_url_replaced` | Swapped a `https://...` `_next` value for `{{THANK_YOU_URL}}` | Template token is portable across domain changes |
-| `honeypot_field_injected` | Added off-screen `name="_gotcha"` input | Spam-bot tripwire |
-| `charset_meta_injected` | Added `<meta charset="UTF-8">` | Required for non-ASCII text |
-| `viewport_meta_injected` | Added `<meta name="viewport">` | Required for mobile rendering |
-| `lang_attr_added` | Added `lang="en"` to `<html>` | Screen reader / SEO compliance |
-| `base_tag_stripped` | Removed `<base>` | Breaks the form-action rewriter |
+| Code                        | What the validator did                                                 | Why it matters                                                                   |
+| --------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `form_action_stripped`      | Removed `action="..."` from `<form>`                                   | Serve route auto-routes to `/api/form-submit`; an existing action would conflict |
+| `form_method_stripped`      | Removed `method="..."` from `<form>`                                   | Same                                                                             |
+| `formspree_url_stripped`    | Replaced a third-party form host (formspree, getform, etc.)            | Form data must flow through Granvl to track conversions                          |
+| `next_field_injected`       | Added `<input name="_next" value="{{THANK_YOU_URL}}">` on LANDING/FORM | Without it the visitor doesn't redirect to thank-you (no auto-conversion)        |
+| `hardcoded_ty_url_replaced` | Swapped a `https://...` `_next` value for `{{THANK_YOU_URL}}`          | Template token is portable across domain changes                                 |
+| `honeypot_field_injected`   | Added off-screen `name="_gotcha"` input                                | Spam-bot tripwire                                                                |
+| `charset_meta_injected`     | Added `<meta charset="UTF-8">`                                         | Required for non-ASCII text                                                      |
+| `viewport_meta_injected`    | Added `<meta name="viewport">`                                         | Required for mobile rendering                                                    |
+| `lang_attr_added`           | Added `lang="en"` to `<html>`                                          | Screen reader / SEO compliance                                                   |
+| `base_tag_stripped`         | Removed `<base>`                                                       | Breaks the form-action rewriter                                                  |
 
 **Warning codes (action required — fix before re-publishing if possible):**
 
-| Code | What to do |
-|---|---|
-| `no_conversion_path` | LANDING page has no `<form>` AND no `data-pages-convert` element. Either add a form (with `_next={{THANK_YOU_URL}}`) or add `data-pages-convert` to the primary CTA, then `update_variant` + re-`publish_funnel`. |
-| `thank_you_has_form` | A `<form>` is on a THANK_YOU page. Move it to the LANDING/FORM/QUIZ page — the conversion fires automatically when the visitor lands here from a form-submit redirect, so a form here is misplaced. `update_variant` to remove the form (or change the page type if intent is different). |
-| `oversized_image` | `<img>` is missing `width` and `height`. Add explicit dimensions to prevent CLS. `update_variant` to add the attributes. |
-| `untrusted_script_src` | An external `<script src="...">` points at a host outside the allowlist (Tailwind CDN, Cloudflare Turnstile). Browsers may block it under our CSP. Either remove the script entirely (configure tracking via Domain settings instead — GTM, Meta CAPI, GA4 all flow server-side) or substitute one of the allow-listed CDNs. |
-| `inline_analytics_script` | Inline GA / GTM / Meta-Pixel / Plausible snippet detected. Remove it — Granvl's first-party analytics + Domain-level CAPI/GTM injection do this server-side, no client-side script needed. `update_variant` to delete the inline `<script>` block. |
-| `missing_title` | `<title>` is missing or set to "Untitled". Set a descriptive page title; SEO + tab labels need it. `update_variant` to update the `<title>` tag. |
-| `no_main_landmark` | No `<main>` element wrapping primary content. Required for screen-reader / Apple Reader / SEO. `update_variant` to wrap the hero + form + content sections in `<main>`. Header / footer / nav stay outside. See §4b. |
+| Code                      | What to do                                                                                                                                                                                                                                                                                                                   |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no_conversion_path`      | LANDING page has no `<form>` AND no `data-pages-convert` element. Either add a form (with `_next={{THANK_YOU_URL}}`) or add `data-pages-convert` to the primary CTA, then `update_variant` + re-`publish_funnel`.                                                                                                            |
+| `form_no_destination`     | The funnel has a `<form>` but no form destination: submissions still fire the conversion, the lead-capture row and the sealed receipt (when the workspace has receipts on), but the contact details go to no CRM. Add one with `set_form_destination` (or the Integrations tab) before sending traffic. Not blocking.                              |
+| `thank_you_has_form`      | A `<form>` is on a THANK_YOU page. Move it to the LANDING/FORM/QUIZ page — the conversion fires automatically when the visitor lands here from a form-submit redirect, so a form here is misplaced. `update_variant` to remove the form (or change the page type if intent is different).                                    |
+| `oversized_image`         | `<img>` is missing `width` and `height`. Add explicit dimensions to prevent CLS. `update_variant` to add the attributes.                                                                                                                                                                                                     |
+| `untrusted_script_src`    | An external `<script src="...">` points at a host outside the allowlist (Tailwind CDN, Cloudflare Turnstile). Browsers may block it under our CSP. Either remove the script entirely (configure tracking via Domain settings instead — GTM, Meta CAPI, GA4 all flow server-side) or substitute one of the allow-listed CDNs. |
+| `inline_analytics_script` | Inline GA / GTM / Meta-Pixel / Plausible snippet detected. Remove it — Granvl's first-party analytics + Domain-level CAPI/GTM injection do this server-side, no client-side script needed. `update_variant` to delete the inline `<script>` block.                                                                           |
+| `missing_title`           | `<title>` is missing or set to "Untitled". Set a descriptive page title; SEO + tab labels need it. `update_variant` to update the `<title>` tag.                                                                                                                                                                             |
+| `no_main_landmark`        | No `<main>` element wrapping primary content. Required for screen-reader / Apple Reader / SEO. `update_variant` to wrap the hero + form + content sections in `<main>`. Header / footer / nav stay outside. See §4b.                                                                                                         |
 
 **This is the contract.** Don't try to "test the validator" — write HTML the right way the first time.
 
@@ -785,12 +849,12 @@ If `warnings` is empty, the funnel is live and you're done — tell the user the
 
 `publish_funnel` also checks every BAKED page against performance budgets and returns `budgetViolations[]` (warn-only — the funnel still goes live). Each entry has a `code`, the numbers, the offending `url` where relevant, and a ready-to-apply `fix`. **Treat a non-empty list as your next task in the same session: apply each fix, `update_variant`, re-publish, confirm the list comes back empty.** Fast pages lower the user's CPC (Google Ads Quality Score includes landing-page experience) — this is money, not cosmetics.
 
-| Code | Budget | The usual fix |
-|---|---|---|
-| `html_too_large` | 150 KB pre-compression | Trim sections, move giant inline SVG/data-URIs to uploaded assets |
-| `image_too_large` | 300 KB per image | Compress/resize (WebP/AVIF at rendered dimensions), `upload_image`, re-reference |
-| `render_blocking_external` | 0 in `<head>` | Add `async`/`defer`; if it's `cdn.tailwindcss.com`, your Tailwind precompile fell back — fix the disallowed pattern and re-save |
-| `inline_script_too_large` | 80 KB total | Prefer CSS-only interactivity; delete dead JS |
+| Code                       | Budget                 | The usual fix                                                                                                                   |
+| -------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `html_too_large`           | 150 KB pre-compression | Trim sections, move giant inline SVG/data-URIs to uploaded assets                                                               |
+| `image_too_large`          | 300 KB per image       | Compress/resize (WebP/AVIF at rendered dimensions), `upload_image`, re-reference                                                |
+| `render_blocking_external` | 0 in `<head>`          | Add `async`/`defer`; if it's `cdn.tailwindcss.com`, your Tailwind precompile fell back — fix the disallowed pattern and re-save |
+| `inline_script_too_large`  | 80 KB total            | Prefer CSS-only interactivity; delete dead JS                                                                                   |
 
 Never tell the user a page is "fully optimized" while `budgetViolations` is non-empty.
 
@@ -813,9 +877,9 @@ Never tell the user a page is "fully optimized" while `budgetViolations` is non-
 3. `get_variant_html(variant_id)` to read what's there.
 4. `duplicate_variant({ variant_id, weight: 0 })` — copy lives on the same page by default, paused (weight 0) so it doesn't immediately compete for traffic.
 5. `update_variant(new_variant_id, html_content, change_summary, ...)` with the iterated HTML + a fresh `angle_hypothesis` explaining what differs from the source.
-6. Tell the user: *"Built a draft at {previewUrl}, paused. Want me to bump weight when you're ready?"*
+6. Tell the user: _"Built a draft at {previewUrl}, paused. Want me to bump weight when you're ready?"_
 
-**Cross-funnel duplication** — *"take this winning variant and try it on my new funnel"*:
+**Cross-funnel duplication** — _"take this winning variant and try it on my new funnel"_:
 
 ```
 duplicate_variant({
@@ -827,13 +891,17 @@ duplicate_variant({
 
 The target page MUST be the same type as the source's page (LANDING→LANDING, QUIZ→QUIZ, etc.). Different types reject with `TYPE_MISMATCH` — call `get_funnel` on the target funnel first to find a matching page.
 
-**Cross-funnel funnel duplication** — *"clone Sarah's whole insurance funnel for our new vertical"*:
+**Cross-funnel funnel duplication** — _"clone Sarah's whole insurance funnel for our new vertical"_:
 
 ```
 duplicate_funnel({ funnel_id, name: "Spring promo — pivoted from insurance" })
 ```
 
-Copies every page + every variant. Status: DRAFT. Source's domain reference is preserved — you'll need to rename slugs OR archive the source before publishing the duplicate, or the publish-time slug-conflict check rejects.
+Copies every page + every variant **and the whole funnel setup**: destinations with their field maps and fallbacks, declared form fields, the qualification rule, phone / state formats, address autocomplete, validation and TrustedForm toggles, cookie banner, stats settings. Status: DRAFT. Source's domain reference is preserved — you'll need to rename slugs OR archive the source before publishing the duplicate, or the publish-time slug-conflict check rejects.
+
+**Do not rebuild delivery on a duplicate.** Everything is already wired; `get_form_destinations(funnel_id)` shows it. Never call `set_form_destination` / `set_funnel_form_fields` on a fresh duplicate "to be safe" — that is how maps drift.
+
+**Duplicate first, land it, then change the form.** When the user wants a copy WITH different questions: (1) `duplicate_funnel`, (2) confirm it landed and read `get_form_destinations(new_funnel_id).formFields`, (3) only then edit the variant — keeping every existing field name exactly, adding the new question with a snake_case name, (4) add the mapping for the new field with `update_form_destination` (or tell the user to map it in Integrations) before publishing. A write that adds a field the destination map does not deliver is refused with the unmapped names; pass `allow_new_fields: true` only when the CRM genuinely should not receive it yet.
 
 **Ownership rule:** the duplicate is owned by the user who triggered the duplication, not the original creator. The activity log preserves the lineage for trust + analytics.
 
@@ -846,21 +914,29 @@ Editing a live variant's `html_content` **in place** blends old-copy and new-cop
 ```jsonc
 {
   "requiresAck": true,
-  "guardrail": { "level": "block", "visitors": 312, "conversions": 18, "paidTraffic": true, "acknowledged": false },
+  "guardrail": {
+    "level": "block",
+    "visitors": 312,
+    "conversions": 18,
+    "paidTraffic": true,
+    "acknowledged": false,
+  },
   "message": "This variant has meaningful live traffic …",
-  "suggestedAction": "duplicate_variant"
+  "suggestedAction": "duplicate_variant",
 }
 ```
 
 Tiers (counted since the variant's last stats reset):
+
 - **0 conversions** → no guardrail. Editing is safe — there's no conversion stat to corrupt (covers brand-new variants AND high-traffic-but-zero-conversion losers).
 - **A few conversions, low volume, no paid spend** → soft `warn`. The edit proceeds, but the response carries a `guardrail` block — surface it to the user.
 - **≥100 visitors OR ≥5 conversions OR any paid-ad traffic** → hard `block` (`requiresAck`). The edit does **not** apply.
 
 **What to do when you get `requiresAck`:**
+
 1. **Default to `duplicate_variant`** + `update_variant` on the new copy. That preserves the live variant's history and starts the iteration on a clean slate.
-2. If the user *explicitly* wants to edit the live one anyway, surface the trade-off first, e.g.: *"Variant A has 312 visitors and 18 conversions (including paid traffic) since its last reset. Editing it will blend the new copy into those stats. Want me to (a) duplicate it and edit the copy, or (b) edit the live one anyway?"*
-3. **Only after the user picks (b)**, retry `update_variant` with `acknowledge_stat_pollution: true`. **Never set that flag on your own initiative** — the *user* consents, not you. (The escape hatch if they edit anyway: a stats reset via the dashboard gives a clean slate from the edit point forward.)
+2. If the user _explicitly_ wants to edit the live one anyway, surface the trade-off first, e.g.: _"Variant A has 312 visitors and 18 conversions (including paid traffic) since its last reset. Editing it will blend the new copy into those stats. Want me to (a) duplicate it and edit the copy, or (b) edit the live one anyway?"_
+3. **Only after the user picks (b)**, retry `update_variant` with `acknowledge_stat_pollution: true`. **Never set that flag on your own initiative** — the _user_ consents, not you. (The escape hatch if they edit anyway: a stats reset via the dashboard gives a clean slate from the edit point forward.)
 
 Every acknowledged edit (and every soft-warn edit that proceeds) is recorded in the workspace audit log with the visitor/conversion counts at edit time — so there's a trail of who took responsibility for the pollution.
 
@@ -927,11 +1003,11 @@ For a variant pitching homeowner insurance comparison:
 
 The four older bucket fields are kept as an additional categorization layer (loose vocabularies, not enforced):
 
-| Field | Vocabulary |
-|---|---|
-| `headline_type` | `question`, `benefit`, `curiosity`, `urgency`, `social-proof`, `pain-point` |
-| `cta_type` | `get-started`, `learn-more`, `get-quote`, `sign-up`, `buy-now`, `book-call`, `download` |
-| `angle` | `pain-point`, `aspiration`, `urgency`, `value`, `fomo`, `authority`, `savings` |
-| `page_style` | `minimal`, `detailed`, `video`, `testimonial-heavy`, `comparison`, `quiz` |
+| Field           | Vocabulary                                                                              |
+| --------------- | --------------------------------------------------------------------------------------- |
+| `headline_type` | `question`, `benefit`, `curiosity`, `urgency`, `social-proof`, `pain-point`             |
+| `cta_type`      | `get-started`, `learn-more`, `get-quote`, `sign-up`, `buy-now`, `book-call`, `download` |
+| `angle`         | `pain-point`, `aspiration`, `urgency`, `value`, `fomo`, `authority`, `savings`          |
+| `page_style`    | `minimal`, `detailed`, `video`, `testimonial-heavy`, `comparison`, `quiz`               |
 
 Use the same vocabulary across a single user's variants — analytics group by exact string match. If you invent a new value, document it back to the user so they can keep it consistent.

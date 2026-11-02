@@ -798,7 +798,7 @@ Returns `{ total, ads: [{ id, competitor, domain, headline, body, cta, format, p
 
 #### `research_landing_page` `{ url, screenshot?, ad_id?, estimate_only? }`
 
-Returns `{ teardown: { url, final_url, title, meta_description, headline, subheadlines, ctas, form_fields, prices, trust_signals, offer_lines, word_count, rendered_with }, attached_to_saved_ads, has_screenshot, credits_charged, balance_credits, next }` plus a screenshot image block. The teardown is kept on the saved ad given by `ad_id`, else on every saved ad that sends to this page.
+Returns `{ teardown: { url, final_url, title, meta_description, headline, subheadlines, ctas, form_fields, prices, trust_signals, offer_lines, word_count, rendered_with }, attached_to_saved_ads, has_screenshot, credits_charged, balance_credits, next }` plus a screenshot image block. The teardown is kept on the saved ad given by `ad_id`, else on every saved ad that sends to this page. Priced by the reader that reads the page: 1 credit with web extraction or a plain fetch, 4 with a browser render (a screenshot asks for the browser). `estimate_only: true` returns `{ estimated_credits, read_by, credits_by_reader, min_credits?, max_credits?, credits_range?, balance_credits, next }` — `estimated_credits` is the reader that will run; the range is where a fallback down the chain can land.
 
 #### `start_offer_research` `{ offer?, topic?, mode?, country, city?, vertical?, landing_page_url?, competitor_domains?, questions?, estimate_only? }`
 

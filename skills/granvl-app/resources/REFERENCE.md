@@ -423,6 +423,10 @@ Direct upload for LOCAL creative files — the path for any video on disk and fo
 
 **List the workspace's creative bucket** (uploaded images/videos, newest first) + shared storage usage vs quota. Check what exists before asking the user to upload; use it to pick creatives when building campaigns.
 
+#### `delete_ad_creative` `{ creative_id }`
+
+**Delete one creative from the bucket and free its storage** — e.g. when uploads fail on the storage quota. Two-step confirm like every delete; the reply carries `bytes_freed` and the updated `storage` usage vs quota. **Refused while the creative is in use** — an ad built from it (or the Meta ad it mirrors), a campaign it is attached to, or a saved campaign draft that lists it — with a message naming what holds it: relay that to the user, don't work around it. Its public file URL stops serving once deleted.
+
 ### Shopify store (read [SHOPIFY.md](./SHOPIFY.md) first)
 
 #### `get_store_summary` `{ days?, store_id? }`

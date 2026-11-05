@@ -466,7 +466,7 @@ Creates the auto-test **and its empty bucket**. `copy_source` decides the ad tex
 - `generate` — copy written from the brand voice, the bucket's angle and ICP, and the destination page, **reviewed against Meta's Advertising Standards before it is stored**. Lines land in the library as Paused; the engine launches only after a person approves them (`update_copy_line` with `status: "winner"`), or `autopilot: "full"` approves lines that clear the rules. **Flagged lines are never launched** — relay the reasons to the user.
 - `custom` — `primary_text` verbatim.
 
-`ad_format` decides how each batch becomes ads: `one_per_creative` (default) builds one ad per creative so the rules can judge each creative; `multi_media` builds ONE Meta multi-media ad per batch carrying all of its creatives (Meta picks the asset per impression; works for lead campaigns). Say the trade-off out loud before choosing `multi_media`: the ad is the reporting unit, so per-creative results and creative-level rules are unavailable.
+`ad_format` decides how each batch becomes ads: `one_per_creative` (default) builds one ad per creative so the rules can judge each creative; `multi_media` builds ONE Meta multi-media ad per batch carrying all of its creatives (Meta picks the asset per impression; works for lead campaigns). Say the trade-off out loud before choosing `multi_media`: the ad is the reporting unit, so per-creative results and creative-level rules are unavailable. Reading such an ad back: its videos and images sit in `media_sourcing_spec`, so its `asset_feed_spec` shows 0 videos.
 
 #### `update_testing_flow` `{ testing_flow_id, ...any of the above, status? }`
 

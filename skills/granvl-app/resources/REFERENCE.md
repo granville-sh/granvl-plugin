@@ -181,6 +181,10 @@ The workspace's brands: `id`, `name`, `isDefault`, `funnelCount`, `domainCount`.
 
 Re-home a domain under another brand (`brand_id` = id, name, or `null` for the default). Organizational only: serving, tracking and connected funnels are untouched. `move_funnels: true` also re-homes every funnel served on the domain (returns `movedFunnels`); without it they stay in their current brand. Needs an OWNER or ADMIN role.
 
+#### `move_creatives_to_brand` `{ ids, brand_id }`
+
+Move ad creatives (1–200 ids from `list_ad_creatives`, `upload_ad_creative` or a video run's `creative_id`) to another brand, as the Creative page's Move to brand does (`brand_id` = id or name; the default brand by its id or name too). Returns `moved`, `skipped` (ids not in this workspace) and `brand { id, name, is_default }`. Folders and strategy are per brand, so each creative leaves its old brand's folder (and with it any auto-test bucket that folder feeds) and drops an angle / ICP stamp from the old brand's strategy. File them in the new brand afterwards with `move_to_folder` (`entity: 'creative'`, the same `brand_id`). Ads, campaigns and results that use the creatives are untouched.
+
 #### `list_folders` `{ kind, brand_id? }`
 
 Folders on one dashboard table: `kind` ∈ `funnel` | `strategy` | `copy` | `creative`.

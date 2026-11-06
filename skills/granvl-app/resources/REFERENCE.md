@@ -382,6 +382,8 @@ Portfolio rollup across **all** funnels in the workspace. `group_by: 'funnel'` (
 
 Read the synced ad-account state — Granvl's **persistent memory** of the user's campaigns/adsets/ads (status, destination URLs, configured UTMs, `lastSyncedAt`). **Read from here** when you just need to know what exists. If `lastSyncedAt` is old, offer to run the sync recipe.
 
+It is synced twice a day, so an ad set built minutes ago (or an ad still `IN_PROCESS` / `PENDING_REVIEW` at Meta) is not here yet — read a just-built ad set **live** with `verify_meta_build { adset_id }` (see [META-ADS.md](./META-ADS.md)).
+
 #### `get_tracking_health` `{}`
 
 Per-ad audit verdicts: `dead_destination` (points at a 404 or archived/unpublished Granvl page — **paying for clicks to a dead page**, fix first) · `missing_utms` · `nonconforming_utms` (missing utm_source/utm_campaign) · `missing_ad_id` (campaign-joinable but no `utm_ad_id` — can't attribute to a specific ad/lander variant; fix via the copy-URL template) · `no_destination` · `healthy`. Destination state is re-checked **fresh at read time** (a page archived after the sync is caught). Each entry carries `issues[]` + a `fix` instruction — act on it via the user's ad MCP and record what you changed with `record_ad_entities source='agent'`. Run after every sync; surface non-healthy counts.
@@ -490,7 +492,7 @@ Write a batch of ad copy + headlines for the auto-test now (otherwise the engine
 
 The campaign-build tool docs live next to their playbooks — read the matching file before any build:
 
-- **Meta** (`create_meta_campaign`, `create_meta_adset`, `update_meta_adset_budget`, `create_meta_ad`, `attach_creatives_to_campaign`, `set_ad_identity`, `list_ad_pixels`, `list_custom_audiences`, `search_ad_interests`, `list_meta_pages`, campaign drafts) → [META-ADS.md](./META-ADS.md)
+- **Meta** (`create_meta_campaign`, `create_meta_adset`, `update_meta_adset_budget`, `create_meta_ad` (video builds run in the background → `poll_meta_ad_build` → `verify_meta_build`), `poll_meta_ad_build`, `verify_meta_build`, `attach_creatives_to_campaign`, `set_ad_identity`, `list_ad_pixels`, `list_custom_audiences`, `search_ad_interests`, `list_meta_pages`, campaign drafts) → [META-ADS.md](./META-ADS.md)
 - **Google** (`create_google_search_campaign`, `create_google_ad_group`, `create_google_search_ad`, `create_google_demand_gen_campaign`, `create_google_demand_gen_ad_group`, `create_google_demand_gen_ad`, `create_google_demand_gen_video_ad`, `search_google_locations`, `set_google_location_targeting`, `create_google_custom_segment`, `list_google_audiences`, `attach_google_audiences`, `generate_keyword_ideas`, `add_google_keywords`, `add_google_negative_keywords`, `get_google_search_terms`, `update_google_campaign`) → [GOOGLE-ADS.md](./GOOGLE-ADS.md)
 - **Microsoft** (`create_microsoft_search_campaign`, `create_microsoft_ad_group`, `create_microsoft_search_ad`, `add_microsoft_keywords`, `add_microsoft_negative_keywords`; keyword planning: `generate_microsoft_keyword_ideas` (live), `get_microsoft_search_terms` + `get_microsoft_keywords` (synced store); B2B LinkedIn targeting: `search_linkedin_companies`, `list_linkedin_profiles`, `set_microsoft_linkedin_targeting` — bid boosts by company/industry/job function) → [MICROSOFT-ADS.md](./MICROSOFT-ADS.md)
 

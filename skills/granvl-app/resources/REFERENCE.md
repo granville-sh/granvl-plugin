@@ -455,6 +455,32 @@ The synced catalog (incl. products with no sales): id, title, handle, variants (
 
 Cost inputs behind contribution margin (defaults 2.9% + $0.30, shipping = what was charged, fallback COGS 0%). Unit costs come from Shopify's Cost per item via the product sync.
 
+#### `get_store_summary` also returns `experiments: { running, concludedLast30d }`
+
+### Storefront A/B tests (read [SHOPIFY.md](./SHOPIFY.md) §5 first)
+
+granvl never writes to the store or the theme; the merchant's Shopify MCP makes theme changes. Writes need EDIT_CONTENT (a CLIENT seat is refused). Every id is workspace-bound: an experiment or store from another workspace is "not found".
+
+#### `create_store_experiment` `{ shop_domain?, store_id?, name, hypothesis?, kind, targeting, variants, allocation? }`
+
+Saves a **DRAFT** (nothing live). `kind`: `content` | `template`. `targeting`: `{ type: 'product'|'collection'|'page', handles? }` (no handles = all), `{ type: 'index' }`, or `{ type: 'path', patterns: ['/blogs/news/*'] }` (content only; never cart / checkout / account / policies / apps). `variants`: control first (`config: {}`), up to 4 in all, integer `weight`s summing to 100; keys are assigned A, B, C, D. Content `config: { ops: [...] }` (max 40; `text {sel,value}`, `attr {sel,name,value}` with name ∈ href / src / srcset / alt / title / class / aria-label, `image {sel,src,srcset?,alt?}`, `show {sel}`, `hide {sel}`, `html {sel,value}` (data-gv-slot targets only), `redirect {to}` (alone, same-store path)). Template `config: { suffix: 'gv-b' }` (`^gv-[a-z0-9-]{1,20}$`, distinct). `allocation` 1–100 (default 100). Returns `{ experiment, snippet_status: { installed, current, last_seen_at, version, tag, where }, next_steps }` — for template tests `next_steps` names `templates/<type>.<suffix>.json`. Errors (nothing saved): a selector with `{ } ; <` or targeting script / iframe / style / the whole page; a `javascript:` / `data:` / `http:` / protocol-relative URL; html with a disallowed tag, attribute, `on*` handler, `style`, comment or unbalanced tag; weights not summing to 100; control config not `{}`; a template test on `path` targeting; several stores and no `shop_domain`.
+
+#### `update_store_experiment` `{ id, name?, hypothesis?, targeting?, allocation?, weights?, variants? }`
+
+`weights` `{ "A": 70, "B": 30 }` (every variant) or a full `variants` list — not both. Refused once concluded / archived. Once a test has run, `variants` must keep the same count and order (keys are positional and the data is keyed by them); set a weight to 0 to stop sending new visitors to a variant. Weight changes affect only visitors not yet assigned (assignments are sticky). On a running test, op / suffix edits go live within ~1 minute and are logged (`live_config_changed: true`); a targeting change re-checks overlap. Returns `{ experiment, config_changed, live_config_changed }`.
+
+#### `set_store_experiment_status` `{ id, status, winner_key?, no_winner?, conclusion? }`
+
+`status`: `running` | `paused` | `concluded` | `archived`. Transitions: draft → running | archived; running ↔ paused; running / paused → concluded | archived; concluded → archived. `running` is refused (409) when the storefront script has never been seen on the store, or when another running experiment covers the same pages (message names it); template tests return a `warnings` line (granvl can't see the theme — check `?view=<suffix>` renders). `concluded` needs `winner_key` (an existing variant) or `no_winner: true`. **`archived` is two-step**: the first call returns `confirmation_required` + a summary + `confirmation_token`; send it again with the token only after the user says yes.
+
+#### `list_store_experiments` `{ shop_domain?, store_id?, status? }`
+
+Experiments (archived hidden unless `status: 'archived'`) with key, kind, status, `targetingSummary`, variants (weights + config), dates, winner; plus each store's storefront `script` status.
+
+#### `get_store_experiment_results` `{ id, range?: { from?, to? } }`
+
+UTC days, `YYYY-MM-DD`; default start → today. Per variant: `exposures`, stamped `orders` / `revenue`, `conversionRate`, `aov`, `revenuePerVisitor`, `newCustomerShare`, `inferred { orders, revenue }` (separate — never add it in), `conversion { probabilityToBeatControl, expectedLift, liftInterval }`, `revenuePerVisitorStats { probabilityToBeatControl, difference, differenceInterval, lift, liftInterval }`, `projectedMer`. Plus `readiness { readiness: 'insufficient'|'ready', daysRun, daysRemainingEstimate, ordersToGo, rule }`, `projected { spend, storeRevenue, currentMer }`, `health { unstampedShare, ordersLast48h, scriptSeenAt, scriptVersion, consentApiFailures24h, status, reasons }`, `notes`. Don't call a winner before `ready`.
+
 ### Auto-testing (creative testing engine)
 
 An **auto-test** is a creative bucket tied to one Meta campaign. Once a day the engine counts never-launched creatives in the bucket and, at or above the threshold, launches them as **PAUSED** ad sets in that campaign (up to 5 creatives per ad set, a flat daily budget per set). The human enables them in Ads Manager. Put creatives for **one angle** in one auto-test — the bucket is the unit of the angle.

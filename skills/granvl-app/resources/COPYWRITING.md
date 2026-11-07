@@ -124,6 +124,15 @@ was. The rationale is also what a human reads when deciding whether to test it.
 `list_copy_lines` returns `opening_three_lines` for every row, so you can
 judge an ad body the way a reader meets it without re-deriving the split.
 
+Each row also carries `compliance_status` (`pass` | `flagged` | `null`) and
+`launch` — `{ state, label, reason }`, the auto-test engine's own launch rule:
+`launchable` (Active and passed review), `needs_review` (Active, not reviewed
+for its current text — the engine reviews it right before launch),
+`held` (flagged — never launched until a person clears it), `not_approved`
+(testing) or `archived`. **Editing a line's body clears its verdict**
+(`compliance_status → null`): the engine reviews the new text before it can
+launch, and a flagged rewrite is held. Re-sending the same text keeps it.
+
 Kinds: `headline`, `subheadline` (surface `landing`); `ad_primary`,
 `ad_headline`, `ad_description` (surface `ad`).
 

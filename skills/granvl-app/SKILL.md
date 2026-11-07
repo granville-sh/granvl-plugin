@@ -67,6 +67,7 @@ If you got this skill through the granvl plugin, it updates with the plugin — 
 - Optionally, at the start of a session, call `get_skill` with `since_version` set to the version you last saw. `upToDate: true` → you're current, carry on. By default the response is SKILL.md plus a file index; fetch a resource with `get_skill({ file: 'resources/PAGE-BUILDING.md' })` when a task needs it, or `include: 'all'` to install every file.
 - Otherwise the response carries `version` and `files[]` (each `{ path, content }`). You can read the files straight from the response. If your client keeps a local copy, `installPaths` names the directory for your client (`claude`, `codex`, `other`); writing there is optional and never required to use granvl.
 - It's read-only — `get_skill` never edits the server's skill.
+- **The skill names a tool your tool list doesn't have?** Unless it is a tiered tool (the ad-platform tools before an ad account is connected, or a staff helper; see the top of this file), your host cached granvl's tool list when the connector was added and the list has changed since; `toolsVersion` in every `get_skill` answer names the live set. Tell the user once to refresh the granvl connector (claude.ai: Settings → Connectors → granvl → refresh, or remove and re-add it; ChatGPT: the granvl connector's settings), then keep working with the tools you have: say it once per conversation, never retry or loop on it.
 
 ---
 

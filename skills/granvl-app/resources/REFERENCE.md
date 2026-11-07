@@ -914,7 +914,7 @@ Credit balances in one read: `sms` (balance / used / granted — one credit per 
 
 #### `get_skill` `{ skill_id?, since_version?, include?, file? }`
 
-The skill, in three sizes: default (`include: 'index'`) returns `SKILL.md` plus an `index` of `{ path, bytes }`; `file: '<path>'` returns one resource; `include: 'all'` returns every file body (for installing under your `installPaths` entry). `since_version` → `upToDate: true` with no bodies when nothing changed. Read-only; default `skill_id: 'granvl-app'`.
+The skill, in three sizes: default (`include: 'index'`) returns `SKILL.md` plus an `index` of `{ path, bytes }`; `file: '<path>'` returns one resource; `include: 'all'` returns every file body (for installing under your `installPaths` entry). `since_version` → `upToDate: true` with no bodies when nothing changed. Read-only; default `skill_id: 'granvl-app'`. Every answer also carries `toolsVersion`, a hash of the live tool set (tool names, argument schemas, annotations: it moves when a deploy adds a tool or changes its arguments). A tool documented here that your client does not list, outside the tiers below, means the host's copy of the tool list is stale: SKILL.md, "Keeping this skill current", says what to tell the user.
 
 **Tool list size.** `tools/list` is tiered: the core tools always; the ad-platform build and live-read tools once the workspace has an ad account connected (or the MCP URL carries `?tools=all`); staff helpers for staff only. A tool you were not shown still works if you call it by name, so a missing tool is never a reason to stop — it is a reason to ask whether an ad account is connected.
 

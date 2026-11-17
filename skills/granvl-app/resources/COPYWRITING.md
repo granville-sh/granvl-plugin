@@ -17,7 +17,8 @@ Copy lives in the workspace, not in the conversation. Before writing anything:
    Reusing or adapting one beats inventing a fifth variation of it.
 2. `list_copy_lines` filtered by `angle_id` / `icp_id` when you know which
    argument you are writing for.
-3. Write. Then `create_copy_lines` to save the set, with a rationale per line.
+3. Write. Then `create_copy_lines` to save the set, with a rationale per line
+   and a `batch` label in snake case (`roof_storm_hooks_v1`; SKILL.md "Naming").
 
 Lines you save land as `testing`, tagged agent-written. Only warehouse-backed
 experiment results can promote a line to `winner`; unpromising or retired lines
@@ -45,8 +46,30 @@ An opening fails when it:
 An opening works when, by line three, the reader knows this is about them,
 what tension it names, and that the next line is worth the second it costs.
 
-Write bodies with real line breaks. Blank lines do not count as one of your
-three — the split skips them, exactly as `openingLines()` does.
+**Separate paragraphs with a blank line.** Write an ad body as short paragraphs
+of one or two sentences each, with a blank line (`\n\n`) between them. Meta
+shows the text exactly as granvl sends it: a single line break is a new line
+with no space under it, so one sentence per line with single breaks reads as a
+cramped column. `create_copy_lines` and `create_meta_ad` store and send what
+you write unchanged, and return a `no_paragraph_spacing` warning when a body
+has line breaks but no blank line. Blank lines do not count toward the
+opening: the split skips them, exactly as `openingLines()` does, so each
+paragraph counts once.
+
+---
+
+## Hooks
+
+The opening lines of an ad body are its hook. Pick it from the hook
+vocabulary in [CREATIVE.md](./CREATIVE.md) section 2 (`question_situation`,
+`number`, `objection_first`, and the rest) and keep that hook's caveat: ask
+about the situation, never the reader's own traits; only the user's verified
+numbers; no bait. One hook per body. Three hooks on one body are three lines
+to test, not one ad.
+
+Start each saved line's rationale with its hook type, `hook: <hook_type>.`,
+so the library reads by hook (`list_copy_lines` returns every rationale; its
+`search` reads the copy itself, not the rationale).
 
 ---
 

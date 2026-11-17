@@ -1,12 +1,14 @@
 # Granvl — Google Ads (Search + Demand Gen)
 
-granvl's opinionated playbooks and build flows for Google Search and Google Demand Gen campaigns. Read [../SKILL.md](../SKILL.md) first for the universal paid-ads invariants (everything lands PAUSED, budget caps, pause-yes / enable-never).
+granvl's opinionated playbooks and build flows for Google Search and Google Demand Gen campaigns. Read [../SKILL.md](../SKILL.md) first for the universal paid-ads invariants (the one-switch status rule, budget caps, pause-yes / enable-never).
 
 **Connect:** the user connects a Google login from the **Ads page settings** ("Connect Google"). Connected Google Ads accounts + spend sync into the **same dashboard** as Meta — list accounts via the Ads switcher; spend/CPL joins (`get_spend_summary`, `get_ad_to_lander_performance`, …) work identically.
 
 **Invariants (both flows, server-enforced — same posture as the Meta build):**
 
-- **Always created PAUSED.** The campaign is the **single spend gate** — ONE switch to activate in Google Ads (unlike Meta's three paused levels). There is deliberately no activate tool; activation is always the human's action. Close every build by telling the user this.
+- **Restricted ad categories.** Declare `ad_category` (NONE included; you classify the offer, SKILL.md "Restricted ad categories") on `create_google_search_campaign` / `create_google_demand_gen_campaign` unless the brand or the funnel of `landing_page_url` already declares one, with `ad_category_countries` when it differs from the campaign's countries; tighten it later with `update_google_campaign`. granvl stores it per campaign and checks every later step against it (ad groups, ads, audiences, locations), tightening from the ad's landing-page funnel when that is stricter. Housing, employment, credit, banking and debt relief: no ZIP `location_ids` and no age / gender / parental / marital targeting in the US and Canada; Canadian FSAs (M5J) are fine, and household income / homeownership are allowed with a warning. Insurance and health insurance keep age and gender on Google (insurance isn't named), but the category is sensitive. Sensitive-interest categories (debt relief, health, addiction, gambling, alcohol): Google doesn't support Customer Match, remarketing lists, lookalikes or optimized targeting, and Demand Gen may not serve; granvl attaches what you pass and returns Google's own words if it refuses. Political ads aren't built on Google. Certification categories return `attestations_needed` for an Owner or Admin to confirm in granvl. Full rules: SKILL.md "Restricted ad categories".
+- **Google's own policy labels.** After a build, the sync reads Google's policy summary for every ad Google does not plainly approve, and the account's advertiser verification once a day. `get_ad_health` returns them as `policy` (disapproved / limited ads with the topic, the countries and what to do; verification deadlines). When Google's topic clearly names a restricted category, granvl tightens the campaign's stored category to it (never looser). A missing certificate is the advertiser's to get from Google; once the account holds it, an Owner or Admin confirms it in Settings → Compliance.
+- **One switch (server-decided).** A new campaign is always created **PAUSED** and is the one switch: ad groups, ads and keywords you create inside it go in **ENABLED** (the result says `status: ACTIVE`) while it stays paused and has never delivered. A new ad group inside an **old** campaign (enabled, has ever delivered even if paused now, or not created by granvl) is created **PAUSED** and becomes the switch; the ads and keywords you then add to it go in enabled. An ad or keyword added to an existing ad group that is not provably new and off is created **PAUSED**. Any check granvl cannot read means PAUSED; `status_reason` / `status_decision.off_switch` on every result say which. There is deliberately no activate tool; activation is always the human's action. Close every build by telling the user which switch to flip.
 - **Budget guardrail:** `daily_budget_usd` (and any bid) is capped at the lower of the workspace admin's cap and granvl's **200 USD per day** platform ceiling BEFORE any write — an over-cap request returns the cap in the error; relay it, NEVER work around it.
 - **Plain URLs, never pre-tagged:** granvl's Google UTM template (**ValueTrack** ids) is applied as the **Final URL suffix** — campaign-wide AND on each ad's own Ad URL options — so spend joins first-party conversions automatically — every `final_url` you provide stays PLAIN.
 
@@ -75,11 +77,11 @@ Search targets by keyword; audiences are a *bid lever*, not the targeting. `atta
 
 ### The Search build — the 3-step flow (walk it conversationally, confirming each step before the write)
 
-1. **`create_google_search_campaign`** `{ account_id, name, daily_budget_usd, countries, search_partners? }` — PAUSED Search campaign: own daily budget (guardrailed), **required** ISO alpha-2 `countries`, Maximize-clicks bidding, ValueTrack UTM suffix auto-applied.
+1. **`create_google_search_campaign`** `{ account_id, name, daily_budget_usd, countries, ad_category, landing_page_url?, search_partners? }` — PAUSED Search campaign: own daily budget (guardrailed), **required** ISO alpha-2 `countries`, Maximize-clicks bidding, ValueTrack UTM suffix auto-applied.
 2. **`create_google_ad_group`** `{ account_id, campaign_id, name, keywords, cpc_bid_usd? }` — the ad group + its keywords (1–100), each `{ text, match_type: BROAD | PHRASE | EXACT, cpc_bid_usd? }`. A keyword's own `cpc_bid_usd` overrides the ad-group bid for that keyword — **only under `MANUAL_CPC`** (automated strategies ignore it), guardrailed like every bid; `add_google_keywords` takes the same field. On a `MANUAL_CPC` campaign every keyword must end up with a bid — set the ad group's `cpc_bid_usd` as the default, or bid each keyword; an ad group with neither is refused (Google would silently fall back to a minimal bid and barely serve). The group and its keywords are created in **one atomic call** — if Google rejects a keyword, nothing is created and the error names it; there is never an empty ad group to clean up. Freshly created campaigns/ad groups show up in `get_ad_entities` after the next sync; the ids returned here are the source of truth until then. **Prefer PHRASE/EXACT for lead-gen** — BROAD without conversion history burns budget on loose queries. Optional `cpc_bid_usd` sets a max-CPC cap (also guardrailed).
-3. **`create_google_search_ad`** `{ account_id, ad_group_id, final_url, headlines, descriptions, path1?, path2? }` — the Responsive Search Ad. Google rotates the copy: **3–15 headlines (≤30 chars each) + 2–4 descriptions (≤90 chars each)** — supply the full spread, not one of each. Optional `path1`/`path2` (≤15 chars each) show as the display path. `final_url` is the PLAIN lander URL.
+3. **`create_google_search_ad`** `{ account_id, ad_group_id, final_url, headlines, descriptions, path1?, path2? }` — the Responsive Search Ad. Google rotates the copy: **3–15 headlines (≤30 chars each) + 2–4 descriptions (≤90 chars each)** — supply the full spread, not one of each. Optional `path1`/`path2` (≤15 chars each) show as the display path. `final_url` is the PLAIN lander URL. The result's `copy_warnings` is granvl's offline copy review for Google and the ad category (no "!" in headlines, no "click here", no unverified "#1", no implied affiliation, no wording that pulls the ad into a sensitive-interest category such as "bad credit OK", the category's own tells, and the landing-page disclosures for credit and lending). The ad is built either way: read them to the user and fix the copy where they apply. The same review runs on `create_google_demand_gen_ad` and `create_google_demand_gen_video_ad`.
 
-Then tell the user: the campaign is paused — review + activate in **Google Ads** (one switch does it; the ad group and ad underneath are already enabled).
+Then tell the user which switch to flip, from `status_decision.off_switch`: for a new campaign, review + turn **the campaign** on in **Google Ads** (the ad group and ad underneath are already enabled); for an ad group you added to an existing campaign, turn **that ad group** on.
 
 ### Ongoing management (the weekly loop)
 
@@ -112,47 +114,244 @@ budget small, and treat it as creative/audience testing, not scaling.
 Hard rules (server-enforced): final URLs on granvl domains must be LIVE; you
 may PAUSE but never ENABLE; budget caps apply.
 
-### Audiences — the whole game
+### Audiences — the whole game (build from the audience library)
 
 An ad group with NO audiences attached = Google targets broadly with your
-money. Never ship that silently. Three levers:
+money. Never ship that silently.
 
-1. **Custom segments** (`create_google_custom_segment`) — keyword-based intent
-   audiences ("people who searched these terms on Google"). THE bridge from
-   Search research: `generate_keyword_ideas` → cluster into themes → one
-   segment per theme. Create them EARLY (they take hours to populate).
-2. **Remarketing lists** (`list_google_audiences` → `user_list_ids`) — site
-   visitors, customer lists. Highest intent; use whenever lists exist.
-3. **Optimized targeting** — `optimized_targeting: false` at launch keeps
+**Start from the library.** `list_google_audiences` with
+`include: ["library"]` returns granvl's audience library for the account's
+brand, each with an `id` (pass it as `audience_ids`), its `kind`, `source`,
+ICP / angle, size, where it is live, and a `compliance` label for the
+account's ad category:
+- **imported**: the account's existing custom segments and lists (granvl
+  mirrors them on every Demand Gen sync and on this read; Customer Match lists
+  show as source `crm`);
+- **granvl's**: anything `create_google_custom_segment` made;
+- **drafts suggested from research** (status `draft`): the report's
+  bottom-of-funnel keyword themes → one search segment each; competitor
+  websites → a sites segment; customer phrases (the report's language bank, an
+  ICP's language to mirror) → an interest segment; ICP buying triggers →
+  life-event and in-market suggestions. A draft is a suggestion: nothing exists
+  on Google until a build or a create call uses it.
+Add `include: ["taxonomy"]` with a `query` ("mortgage", "moving") for Google's
+in-market, affinity, life event and detailed demographic ids (pass as
+`taxonomy_ids`), and `"performance"` for each audience's latest call.
+
+The levers on `create_google_demand_gen_ad_group` / `attach_google_audiences`:
+1. **`audience_ids`** (library ids): a custom segment with no copy on this
+   account is CREATED on Google on first use from its definition (they take
+   hours to populate: build early). Lists and lookalikes live in one Google
+   account and are never copied.
+2. **`taxonomy_ids`**: `user_interest:<id>` (in-market, affinity) and
+   `life_event:<id>`. Detailed demographics can't be attached by granvl yet
+   (they need Google's grouped Audience resource): say so and set them in
+   Google Ads if the user wants them.
+3. **`excluded_user_list_ids`**: exclude converters and existing customers
+   from prospecting cells (only lists can be exclusions on Google).
+4. **Optimized targeting**: `optimized_targeting: false` at launch keeps
    spend INSIDE your audiences (recommended); flip to true later to let Google
    expand once conversions flow.
+`custom_audience_ids` / `user_list_ids` (raw Google ids) still work.
 
-### The SANG flow (Single Angle ad Groups — one audience theme, one lander)
+**Making new audiences** (`create_google_custom_segment`, returns the library
+`audience_id`): `keywords` (type SEARCH, the bridge from Search research:
+`generate_keyword_ideas` → themes → one segment per theme), `urls`
+(competitors' sites) or `apps`; `type: "INTEREST"` is sent as AUTO (Google no
+longer creates INTEREST segments). `kind: "site_visitors"` + `url_rules` makes
+a rule-based list of people who visited matching URLs (e.g. the thank-you page:
+an exclusion and a lookalike seed; it needs the Google tag on the site).
+`kind: "lookalike"` + `seed_user_list_ids` (lists ALREADY in the account) +
+`expansion` (narrow / balanced / broad) + `countries`. Or `audience_id` to
+create a library draft as defined. Name every new audience in snake case, in
+this order: `{brand}_{icp}_{kind}_{theme}_v1` (e.g.
+`acme_homeowners_35_54_search_roof_repair_v1`; SKILL.md "Naming"). Library
+drafts granvl generates are named this way already.
 
-STAG's sibling: one ad group per audience theme/angle, each with its own
-message-matched lander, minted by granvl during planning.
+**What granvl will not do.** It never uploads a customer list, a hashed email
+or any personal data (granvl stays out of the data path): customer lists and
+CRM-pushed lists are the customer's to build in their own Google account, and
+granvl attaches what exists. It never gates an audience by ad category: the
+`compliance` label and the result's `ad_category.warnings` are warnings, and
+when Google refuses an audience its own message comes back verbatim. Tell the
+user what the warning says; don't look for a way around Google's answer.
+For the sensitive-interest categories (debt relief, health, addiction,
+gambling, alcohol) Google says Customer Match, your-data segments,
+lookalikes and optimized targeting aren't supported (label
+`blocked_by_platform`): lean on custom segments and in-market audiences.
+Lookalikes act as suggestions now (they widen reach), so they are never a
+test variable.
 
-1. **Intake**: offer, geo, budget, recipe. Confirm an ACTIVE domain (`list_domains`) and image creatives in the bucket (`list_ad_creatives`) — DG needs landscape 1.91:1 + square 1:1 minimum, portrait 4:5 recommended, plus a square logo ≥128×128. Missing creatives → `upload_ad_creative` first.
-2. **Research**: `generate_keyword_ideas` → cluster into 2-4 audience THEMES (intent clusters, not single keywords). Check `list_google_audiences` for remarketing lists worth their own ad group.
-3. **The Plan** (sign-off #1): themes, the custom-segment keywords per theme, creatives per theme, budget, recipe, the lander each theme gets. `save_campaign_draft`.
-4. **Segments**: `create_google_custom_segment` per theme NOW (populate while you build).
-5. **Landers**: one LANDING page per theme, headline matched to the ANGLE (pain-point / aspiration / social-proof — the variant `angle` metadata). DG visitors are colder than Search: lead with the hook, not the form.
-6. **Sign-off #2 + publish**: `create_preview_link` → approval → `publish_funnel`.
-7. **Build**: `create_google_demand_gen_campaign` (recipe rules apply) → one `create_google_demand_gen_ad_group` per theme with `custom_audience_ids` (+ `user_list_ids`) and `optimized_targeting: false` → `create_google_demand_gen_ad` (image pack + logo) and/or `create_google_demand_gen_video_ad` (YouTube-hosted URLs only — bucket videos can't be used). Plain final URLs; everything lands PAUSED.
-8. **Close the loop**: `get_tracking_health`; hand off ("activate in Google Ads when ready").
+### Demand Gen - the audience x creative test (manual, today)
+
+On Demand Gen the campaign holds the budget and bidding, the ad group holds
+the audience and the channels, and the ad is a pack of assets Google mixes.
+So the test unit is **audience x concept**, and **a campaign with ONE ad
+group is the Demand Gen "ad set"**: one budget, one audience, one cell (the
+live account that spends on Demand Gen converged on exactly this). Every
+cell is judged on **granvl's first-party leads** (what landed), not Google's
+conversion count: Google's includes engaged-view and modelled conversions and
+runs about 2x higher. Say which number you judge by.
+
+**Before building:** a LIVE granvl lander (`publish_funnel`);
+`get_google_conversion_actions` shows an action that counts granvl leads; a
+qualification rule on the funnel (`set_qualification_rule`) so cells can be
+judged on qualified leads too; images in the bucket at 1.91:1, 1:1, 4:5 and
+9:16 (at least one landscape or square) plus a square logo of at least
+128 px; for video, videos in the bucket (the default: granvl uploads them to
+YouTube, unlisted, on the Google-managed channel), or the user's own YouTube
+links when they have them.
+
+**Structure by budget**
+- **$100-200/day:** TWO or THREE campaigns, ONE ad group each (at least
+  $40/day per campaign). Each campaign is one test cell, like an ABO ad set
+  on Meta. Optionally a 10-15% retargeting campaign once a site-visitor list
+  has 1,000+ users, kept out of the test, converters excluded.
+- **$50-99/day:** ONE campaign, TWO ad groups, one audience each. Google
+  moves spend to the ad group it predicts will win; an ad group under about
+  25% of the spend after 7 days is "untested", not "lost", and gets its own
+  campaign next round.
+- Name every cell by the convention (SKILL.md "Naming"), its parts in this
+  order: the campaign `DG_{Offer}_{Audience}_{Concept}_{YYYYMMDD}` in
+  Title_Case (`DG_Roof_Replacement_Roof_Repair_Searchers_Storm_Calendar_20261110`),
+  the ad group `{audience}_x_{concept}` in snake case
+  (`roof_repair_searchers_x_storm_calendar`). Save the plan with
+  `save_campaign_draft`.
+
+**Phase 1 - test audiences, hold the creative constant**
+1. Audiences, one per cell, from the library (`list_google_audiences`
+   `include: ["library"]`): A = the research's strongest bottom-of-funnel
+   search draft; B = a second theme, the competitor-sites draft, or the ICP's
+   buying-trigger audience. Prefer `compliance: allowed`; read any warning to
+   the user. Keep remarketing lists out of the test; run them as their own
+   small campaign later.
+2. One `create_google_demand_gen_campaign` per cell (or one campaign below
+   $100/day), then `create_google_demand_gen_ad_group` with
+   `audience_ids: [<one library id>]` (its custom segment is created on
+   Google on first use; build early, it takes hours to populate),
+   `excluded_user_list_ids` for converters / customers,
+   **`optimized_targeting: false`** (otherwise the cell measures "audience +
+   Google's expansion"), and
+   `channel_strategy: "ALL_OWNED_AND_OPERATED_CHANNELS"` for image ads.
+3. **The same ad in every cell**: `create_google_demand_gen_ad` with identical
+   `creative_ids`, headlines (5 x 40 chars max), descriptions (5 x 90 max),
+   logo and business name. granvl records which bucket creative became which
+   Google asset, so `get_creative_performance` can read it back. Video goes
+   in its own ad group (YouTube Shorts / in-feed channels), never mixed into
+   the image test.
+4. Bidding: Max Clicks + `max_cpc_usd` at launch, or Max Conversions with no
+   target once the conversion action is confirmed.
+5. Status (the one-switch rule): each new campaign is created **PAUSED** with
+   its ad group and ad **enabled** inside it, so the campaign is the only
+   switch. The user turns the campaigns on in Google Ads, together, so the
+   cells start on the same day.
+
+**Reading (weekly, from day 7)**
+- Start with the calls: `get_ad_breakdowns` with `platform: "GOOGLE"`,
+  `dimension: "audience"`, the last 30 days (`since` / `until`). It returns
+  the same Audiences level as the Google Insights page (Decision matrix,
+  Campaign type Demand Gen, the Audiences tab): one row per audience across
+  its ad groups, each with its `call` and `reason`, judged on the account's
+  ceiling with the Demand Gen criteria (Set criteria, Demand Gen section):
+  - **Untested**: under 30 clicks, or under 2x the ceiling spent, in its
+    first 7 days. Never cut an untested cell.
+  - **Off**: over the ceiling on 14 AND 30 days. Pause its cell (say why).
+  - **Bench**: under the ceiling over 30 days, over it in the last 14: a
+    fading winner. Refresh the concept before cutting it.
+  - **Scale**: at least 5 leads in 14 days under the ceiling. Raise its
+    campaign budget at most 20% (`update_google_campaign` queues a proposal
+    the user approves), at least 7 days between raises.
+  - **Keep**: everything else under the ceiling.
+  - **Mixed ad group**: the audience shares its ad group with other
+    audiences, so granvl's leads can't be split (`granvlLeadsShared`; no
+    click macro names the matched audience). It is not judged: move it into
+    its own cell. This is why a cell carries ONE audience (or one Google
+    grouped audience).
+  Leads are **granvl first-party leads** by default (`audiences.judgeBy`);
+  when no granvl lead joined in 30 days the calls fall back to Google's
+  conversions (`audiences.firstPartyFallback`; fix the tracking first).
+  Google's conversions only judge days at least 2 days old.
+- Read `audiences.warnings` every week: the same audience live in two
+  cells (their reads are not independent), a your-data list one cell
+  retargets not excluded from a prospecting cell, keyword segments sharing
+  half their keywords. Fix these before trusting a call.
+- `audiences.expansion`: with optimized targeting on, the ad group total
+  minus its audience rows, an estimate. Test cells keep optimized targeting
+  off; a large expansion share means the cell is measuring Google's reach,
+  not the audience.
+- Per cell totals: `get_spend_summary` (ad group rows: spend, granvl leads,
+  qualified, CPL / CPQL). On the Insights page the Ad groups level judges
+  each Demand Gen ad group on the same rules and shows its channel lens.
+- Audience x concept: the Audiences tab's "Audience x concept" view (rows
+  audiences, columns the ads by concept; empty cells never ran).
+  `get_ad_breakdowns` `dimension: "audience"` + `level: "ad_group"` gives
+  the audience x ad group grid.
+- Channels: `get_ad_breakdowns` `dimension: "channel"` (Discover / Gmail /
+  YouTube in-stream / in-feed / Shorts, per ad group with `level`), and
+  `get_segmented_stats` with `dimension: placement` for the first-party side
+  (youtube / gmail; empty is Discover, an approximation).
+- Google's count vs granvl's: `get_ad_breakdowns`
+  `dimension: "attribution_event"` splits Google's conversions into
+  interaction / engaged view / impression. The no-click part is real to
+  Google and invisible to granvl; it is why the two numbers differ.
+- What a cell targets, and since when: `list_google_ad_groups` returns each
+  Demand Gen ad group's `targeting` (audiences, optimized targeting,
+  channels, `since`).
+- Creative: `get_creative_performance` with `platform: "GOOGLE"` (Google's
+  per-asset numbers for each bucket creative; first-party leads are per ad,
+  so they show as `sharedConversions`; `by_asset: true` lists every asset of
+  every ad with Google's rating).
+- Say which number each call used (granvl leads or Google conversions). One
+  change per cell per week; never change the goal and the budget together.
+
+**Phase 2 - test creative inside the winning audience**
+- A new cell (campaign) with the winning audience and the NEW concept, same
+  budget; the old cell keeps running as the control. Judge as above.
+
+**Then consolidate**
+- The winning audience + concept become the scale campaign. Only after about
+  30 conversions in 30 days: `attach_google_audiences` with
+  `optimized_targeting: true`, and graduate bidding (`update_google_campaign`).
+- If one channel's granvl CPL is over 2x another's (YouTube often is), give
+  video its own campaign or drop that channel from the image ad groups.
+
+**Regulated offers** (mortgage, credit, loans, banking, housing, jobs): no
+age, gender, parental or marital status, or ZIP / postal narrowing (Canada
+may use the 3-character FSA), no demographic exclusions; city, country and
+radius targeting are fine. **Insurance** is a sensitive category but Google
+does not name it in consumer finance, so age targeting stays available on
+Google (Meta and Microsoft restrict it): say it is sensitive. For debt
+relief or credit repair offers: no remarketing lists, no lookalikes, no
+optimized targeting, and expect Demand Gen to serve poorly or not at all.
+Say so before building. The library's `compliance` labels say this per
+audience; they are warnings, never a block.
+
+**After every change:** `record_ad_entities` (`source: 'agent'` + note).
+After every call: `save_learning` with the audience, the concept, the metric
+(granvl leads or Google conversions) and the numbers, losers too.
 
 ### The Demand Gen build — the 3-step flow (visual ads on Discover / YouTube / Gmail)
 
-1. **`create_google_demand_gen_campaign`** `{ account_id, name, daily_budget_usd, countries, location_ids?, excluded_location_ids?, languages? }` — PAUSED Demand Gen campaign, same guardrails as Search. Location **and language** targeting live on the campaign (every ad group inherits them): `languages` takes ISO 639-1 codes (`["en"]`, `["en","fr"]`); omit for all languages. Budget, campaign and criteria are created in one atomic call — a rejected criterion creates nothing.
-2. **`create_google_demand_gen_ad_group`** `{ account_id, campaign_id, name }` — **no keywords** — Demand Gen targets audiences, not queries. Attach targeting here: `custom_audience_ids` (+ `user_list_ids`), `optimized_targeting: false` recommended at launch. **Channels** (where the ads show) are per ad group: omit for all channels; `channel_strategy: "ALL_OWNED_AND_OPERATED_CHANNELS"` drops third-party Display; or pick `channels: [...]` from `YOUTUBE_IN_STREAM, YOUTUBE_IN_FEED, YOUTUBE_SHORTS, DISCOVER, GMAIL, DISPLAY, MAPS` (e.g. a Shorts-only ad group for 9:16 video).
-3. **`create_google_demand_gen_ad`** `{ account_id, ad_group_id, final_url, business_name, headlines, descriptions, creative_ids, logo_creative_id, call_to_action_text? }` — the multi-asset IMAGE ad. Provide bucket `creative_ids` (`upload_ad_creative` first; auto-bucketed by aspect from the stored dimensions, which are measured on upload — landscape 1.91:1 / square 1:1 / portrait 4:5 (1080×1350); 9:16 vertical errors, put those in a video ad). REQUIRED: a **square logo** creative (**≥128×128**) via `logo_creative_id`, `business_name` (**≤25 chars**), **1–5 headlines (≤40 chars each)**, **1–5 descriptions (≤90 chars each)**; optional `call_to_action_text` (e.g. "Get quote"). **Bucket videos are rejected** with a clear error — Google requires YouTube-hosted video for DG video ads; use `create_google_demand_gen_video_ad` with a YouTube URL, or images.
+1. **`create_google_demand_gen_campaign`** `{ account_id, name, daily_budget_usd, countries, ad_category, landing_page_url?, location_ids?, excluded_location_ids?, languages?, targeting_level? }` — PAUSED Demand Gen campaign, same guardrails as Search. By default location **and language** targeting live on the campaign (every ad group inherits them): `languages` takes ISO 639-1 codes (`["en"]`, `["en","fr"]`); omit for all languages. Budget, campaign and criteria are created in one atomic call — a rejected criterion creates nothing. `targeting_level: "ad_group"` opts into Google's upgraded targeting: the campaign carries no geo and granvl puts the same locations and languages on every ad group it builds there (immutable after create; only when the user wants geo per ad group).
+2. **`create_google_demand_gen_ad_group`** `{ account_id, campaign_id, name }` — **no keywords** — Demand Gen targets audiences, not queries. Attach targeting here: `audience_ids` (library ids; + `taxonomy_ids`, `excluded_user_list_ids`, or raw `custom_audience_ids` / `user_list_ids`), `optimized_targeting: false` recommended at launch. **Channels** (where the ads show) are per ad group: omit for all channels; `channel_strategy: "ALL_OWNED_AND_OPERATED_CHANNELS"` drops third-party Display; or pick `channels: [...]` from `YOUTUBE_IN_STREAM, YOUTUBE_IN_FEED, YOUTUBE_SHORTS, DISCOVER, GMAIL, DISPLAY, MAPS` (e.g. a Shorts-only ad group for 9:16 video).
+3. **`create_google_demand_gen_ad`** `{ account_id, ad_group_id, final_url, business_name, headlines, descriptions, creative_ids, logo_creative_id, call_to_action_text? }` — the multi-asset IMAGE ad. Provide bucket `creative_ids` (`upload_ad_creative` first; auto-bucketed by aspect from the stored dimensions, which are measured on upload — landscape 1.91:1 / square 1:1 / portrait 4:5 (1080×1350) / vertical 9:16 (1080×1920, at least 600×1067); at least one landscape or square; up to 20 across ratios). REQUIRED: a **square logo** creative (**≥128×128**) via `logo_creative_id`, `business_name` (**≤25 chars**), **1–5 headlines (≤40 chars each)**, **1–5 descriptions (≤90 chars each)**; optional `call_to_action_text` (e.g. "Get quote"). Bucket videos don't go here: use `create_google_demand_gen_video_ad` (the video variant below).
 
-Then tell the user: the campaign is paused — review + activate in **Google Ads** (one switch does it; the ad group and ad underneath are already enabled).
+   **Video variant: `create_google_demand_gen_video_ad`** `{ account_id, ad_group_id, final_url, business_name, headlines, long_headlines, descriptions, logo_creative_id, creative_ids?, youtube_urls? }`. Videos come from two sources, in this order:
+   - **Default: `creative_ids`**, bucket videos (`upload_ad_creative`; 10 seconds or longer to run in-stream). granvl uploads them to YouTube through the Google Ads API, unlisted, on the Google-managed channel linked to the ad account.
+   - **`youtube_urls`** only when the user gives a YouTube link or asks to use their own channel (their videos there, public or unlisted).
+   - Both can be mixed, 1-5 videos in total. Same copy limits as the image ad, plus 1-5 long headlines (at most 90 characters each).
+   - YouTube processing takes minutes, so a call with `creative_ids` can return `pending: true` with no ad: call it again with the same arguments a few minutes later and granvl reuses the uploads (nothing is uploaded twice).
+
+Then tell the user which switch to flip, from `status_decision.off_switch`: for a new campaign, review + turn **the campaign** on in **Google Ads** (the ad group and ad underneath are already enabled); for an ad group you added to an existing campaign, turn **that ad group** on.
 
 ### Ongoing management (DG weekly loop)
 
-No search-terms report here — the levers are CREATIVE and AUDIENCE:
-- `get_creative_performance` / `get_ad_breakdowns` per ad group: kill image packs with spend + no engagement, feed winning angles back into new creatives AND lander variants (same angle, both sides).
-- Compare ad groups (= audience themes) on CPL from `get_spend_summary`: losing theme → pause it (say why); winning theme → deepen its segment keywords or add a lookalike-ish broader segment.
-- Graduate bidding here too: ~15+ conversions/30d → `update_google_campaign` to MAXIMIZE_CONVERSIONS (harness asks for the confirmation again).
-- After ANY change, `record_ad_entities` (`source: 'agent'` + note).
+No search-terms report here; the levers are AUDIENCE, CREATIVE and CHANNEL,
+read as in "Reading" above: the weekly read is `get_ad_breakdowns`
+`dimension: "audience"` (calls, shared flags, expansion, warnings), then the
+channel and attribution reads. Judge by granvl leads by default, name the
+number you use, pause an Off cell (say why), deepen a winning audience's
+segment keywords, and graduate bidding at about 15+ conversions in 30 days
+(`update_google_campaign` to MAXIMIZE_CONVERSIONS; the harness asks for the
+confirmation again). After ANY change, `record_ad_entities` (`source:
+'agent'` + note).

@@ -58,9 +58,11 @@ Do NOT: hand-add `gv_cid` or `utm_*` to store links; tell the user to install Me
 **Metric definitions (pinned — quote them, don't improvise):**
 
 - **Revenue** = order total − tax, with edits and refunds applied (net of refunds as of the read). Test orders excluded.
-- **MER** = revenue ÷ ad spend over the same window (all synced platforms). The blended truth; attribution rows below are a _split_ of it, never a sum that exceeds it.
+- **Money and days:** every figure is in the store's `currency`, over the shop's own days (`timeZone`). Ad spend from an account in another currency is converted at each day's ECB rate (`spend_converted`); spend whose currency the ad platform hasn't confirmed is left out (`spend_excluded`, a `message` per account: say it before quoting MER, CAC or margin). With stores in different currencies and no `store_id`, `get_store_summary` answers `per_store`: never add them up.
+- **MER** = revenue ÷ ad spend over the same window (the store's ad accounts). The blended truth; attribution rows below are a _split_ of it, never a sum that exceeds it.
 - **New-customer orders** = Shopify `customerOrderIndex === 1`. **nCAC** = spend ÷ new-customer orders.
-- **Contribution margin** = revenue − COGS (unit cost × units, fallback % where missing) − shipping cost − payment fees. Says whether the ads _made money_, not just revenue.
+- **Contribution margin** = revenue − COGS (unit cost × units, fallback % where missing) − shipping cost − payment fees − ad spend. Says whether the ads _made money_, not just revenue. `cogsCoverage` = the share of revenue whose items have a unit cost; below 1 with no fallback COGS %, margin is overstated (`marginNote` says by how much of revenue: quote it). `shippingCostAssumed: true` = no shipping cost was set, so the shipping charged stands in for it.
+- **Import still running:** while `import_status[].note` is set (60-day order history or the catalogue still syncing), the window's numbers are incomplete: say so first.
 - **Attributed revenue / coverage** = revenue on orders that carry a touch (gv_cid or snippet or Shopify's own journey) ÷ all revenue. Coverage < 60% with the snippet installed means the theme isn't loading it — point the user at Tracking health on the Store page.
 - **Attribution rows** show `joined: true|false` — `false` means the order's campaign/ad could not be matched to synced spend (UTMs stripped, campaign renamed, platform not connected). Report it; don't invent a ROAS for it.
 - **Models:** `lastNonDirect` is the default for "which ad gets credit"; `first` for "which ad introduced the customer"; `last` for the strict last-click view. Always say which one you used.

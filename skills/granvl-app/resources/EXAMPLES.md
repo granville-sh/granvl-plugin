@@ -25,7 +25,7 @@ No funnels = new workspace. Run a *tight* intake (don't interrogate — two ques
 ### Step 2 — Build immediately (don't pause)
 
 ```
-create_funnel({ name: "Acme Perks — demo", funnel_type: "standard", platform: "META" })
+create_funnel({ name: "acme_perks_demo", funnel_type: "standard", platform: "META" })
   # → auto-bootstraps a LANDING + THANK_YOU page. Grab the LANDING page.id.
 create_variant({
   page_id,            # the auto-created LANDING page — no create_page needed
@@ -49,7 +49,7 @@ Give them the `previewUrl` from the `create_variant` response:
 
 **Do NOT `publish_funnel`** — there's no domain yet; the preview URL is the deliverable. Publish later, when they connect a domain.
 
-**Activity rows:** `Created funnel "Acme Perks — demo"`, `Created variant "v1"` (verb: `created`, color: green).
+**Activity rows:** `Created funnel "acme_perks_demo"`, `Created variant "v1"` (verb: `created`, color: green).
 
 ---
 
@@ -73,7 +73,7 @@ Once they answer (say *"Meta"*):
 
 ```
 create_funnel({
-  name: "Northline Delivery Hiring",
+  name: "northline_delivery_hiring",   # the agent names the funnel (SKILL.md "Naming")
   description: "Delivery driver hiring — Vancouver",
   funnel_type: "standard",
   platform: "META"
@@ -84,7 +84,7 @@ If the user had said *"build me a landing page for my Meta ads"* in the original
 
 Response will include the two auto-bootstrapped pages: a LANDING and a THANK_YOU. Capture both `page.id` values.
 
-**Activity row written:** `Created funnel "Northline Delivery Hiring"` (verb: `created`, color: green)
+**Activity row written:** `Created funnel "northline_delivery_hiring"` (verb: `created`, color: green)
 
 ### Step 3 — Draft the LANDING variant
 
@@ -97,7 +97,7 @@ Generate the HTML following the form-driven template in REFERENCE.md. Pick metad
 ```
 create_variant({
   page_id: "<LANDING page id>",
-  name: "Hiring v1 — benefit hero",
+  name: "hiring_v1_benefit_hero",
   html_content: "<!doctype html>...",
   weight: 100,
   headline_type: "benefit",
@@ -107,7 +107,7 @@ create_variant({
 })
 ```
 
-**Activity row written:** `Generated variant "Hiring v1 — benefit hero" — Benefit headline · Value angle` (verb: `generated`)
+**Activity row written:** `Generated variant "hiring_v1_benefit_hero"`, followed by its headline type and angle (`Benefit headline · Value angle`) (verb: `generated`)
 
 ### Step 4 — Draft the THANK_YOU variant
 
@@ -116,7 +116,7 @@ The thank-you variant doesn't get A/B'd; one variant at 100%.
 ```
 create_variant({
   page_id: "<THANK_YOU page id>",
-  name: "Thank you — default",
+  name: "thank_you_default",
   html_content: "<!doctype html>...",
   weight: 100
 })
@@ -126,7 +126,7 @@ create_variant({
 
 Don't activate the variants yet. Reply to the user with:
 
-> Built `Northline Delivery Hiring` with a benefit-led landing + thank-you page. Both are in DRAFT — preview URLs:
+> Built `northline_delivery_hiring` with a benefit-led landing + thank-you page. Both are in DRAFT. Preview URLs:
 > - Landing: `<previewUrl>`
 > - Thank-you: `<previewUrl>`
 >
@@ -157,7 +157,7 @@ If existing variant is at 100%, create the new one at 50% and we'll rebalance:
 ```
 create_variant({
   page_id: "<LANDING page id>",
-  name: "Hiring v2 — question hero",
+  name: "hiring_v2_question_hero",
   html_content: "<!doctype html>...",
   weight: 50,
   headline_type: "question",
@@ -379,7 +379,7 @@ The platform validates HTML on every variant, auto-fixes mechanical issues (form
 
 ```json
 {
-  "message": "Published \"Northline Delivery Hiring\". 4 auto-fixes applied across 2 variants; 0 warnings.",
+  "message": "Published \"northline_delivery_hiring\". 4 auto-fixes applied across 2 variants; 0 warnings.",
   "liveUrl": "https://quote.example.com",
   "validation": {
     "variantsChecked": 4,
@@ -885,7 +885,7 @@ This is the kind of read that turns a quick "ship it" into a 60-second decision 
 
 > **User:** "Spin up a Google Search campaign for the Northline hiring lander — $50/day, Canada only."
 
-See GOOGLE-ADS.md for the invariants (always PAUSED, $200/day guardrail, plain URLs — the ValueTrack suffix carries the UTMs).
+See GOOGLE-ADS.md for the invariants (campaign always PAUSED as the one switch, $200/day guardrail, plain URLs — the ValueTrack suffix carries the UTMs).
 
 ### Step 1 — Campaign (PAUSED, guardrailed budget, countries required)
 
@@ -894,7 +894,7 @@ Confirm the account (Ads switcher) and the plan before writing, then:
 ```
 create_google_search_campaign({
   account_id: "1234567890",
-  name: "Northline Hiring — Search — CA",
+  name: "Northline_Hiring_Search_CA",   # campaigns: Title_Case with underscores
   daily_budget_usd: 50,          # capped at min(workspace cap, $200/day)
   countries: ["CA"]
 })
@@ -908,7 +908,7 @@ The response confirms the campaign is PAUSED and that granvl's Google UTM suffix
 create_google_ad_group({
   account_id: "1234567890",
   campaign_id: "<from step 1>",
-  name: "delivery driver jobs vancouver",
+  name: "delivery_driver_jobs_vancouver",
   keywords: [
     { text: "delivery driver jobs vancouver", match_type: "PHRASE" },
     { text: "courier jobs vancouver",         match_type: "PHRASE" },
@@ -946,9 +946,127 @@ Supply the full spread of headlines/descriptions — Google rotates them; one of
 
 ### Step 4 — Reply (the PAUSED close)
 
-> Done — the whole chain is built: campaign "Northline Hiring — Search — CA" ($50/day, Canada), one ad group with 3 phrase/exact keywords, and a responsive search ad with 5 headlines + 2 descriptions pointing at your lander. **The campaign is paused — nothing spends until you flip it on in Google Ads** (one switch: the ad group and ad under it are already enabled). Tracking's handled: granvl's UTM suffix is on the campaign, so spend will join your first-party conversions automatically.
+> Done: the whole chain is built: campaign "Northline_Hiring_Search_CA" ($50/day, Canada), one ad group with 3 phrase/exact keywords, and a responsive search ad with 5 headlines + 2 descriptions pointing at your lander. **The campaign is paused: nothing spends until you flip it on in Google Ads** (one switch: the ad group and ad under it are already enabled). Tracking's handled: granvl's UTM suffix is on the campaign, so spend will join your first-party conversions automatically.
 
-**Activity rows:** `Created Google campaign "Northline Hiring — Search — CA"`, `Created ad group "delivery driver jobs vancouver"`, `Created responsive search ad`.
+**Activity rows:** `Created Google campaign "Northline_Hiring_Search_CA"`, `Created ad group "delivery_driver_jobs_vancouver"`, `Created responsive search ad`.
+
+---
+
+## 15. "Make five static ads for my roofing offer"
+
+> **User:** "Make five static ads for our roof replacement offer in Denver, for Meta feeds and Reels. We do free inspections and a written quote within 48 hours."
+
+Read [CREATIVE.md](./CREATIVE.md) first.
+
+### Step 1: Read what exists (free)
+
+```
+get_brand_kit            # logo, colours, product images
+list_copy_lines          # winners to reuse for the ad body
+list_ad_creatives        # what this brand already ran
+```
+
+The two facts the user gave are the only facts the images may carry. Roofing usually builds as `ad_category: NONE`; read the `ad_category` block on the campaign result anyway.
+
+### Step 2: Five concept cards, shown before rendering
+
+| concept | hook_type | format at aspect | headline |
+|---|---|---|---|
+| `after_the_hail` | `timely_local` | `calendar-punch` at 4:5 | "After the hail: book a roof check" |
+| `written_quote` | `result_first` | `itemized-receipt` at 4:5 | "An itemized quote in 48 hours" |
+| `inspection_first` | `objection_first` | `notes-app` at 4:5 | "Not sure yet? The inspection is free." |
+| `hidden_damage` | `problem_in_action` | `hero-object` at 4:5 | "Hail damage hides on the shingles" |
+| `two_numbers` | `number` | `big-stat-serif` at 4:5 | "Free inspection. Quote in 48 hours." |
+
+Each card also carries its angle, ICP, awareness, CTA ("Book an inspection"), facts used and name (CREATIVE.md section 1). Feeds and Reels means each concept twice, 4:5 and 9:16: tell the user it is ten renders and the credits, then go.
+
+### Step 3: Render, then check every image
+
+```
+get_creative_format({ format: "calendar-punch" })
+compose_creative_brief({ format: "calendar-punch", offer: "Roof replacement in Denver",
+  angle: "After the hail", headline: "After the hail: book a roof check",
+  facts: ["Free roof inspection", "Written quote within 48 hours"], aspect_ratio: "4:5" })
+generate_image({ brief, aspect_ratio: "4:5" })      # then again at 9:16
+```
+
+Look at each preview (CREATIVE.md section 3). The receipt came back with a made-up phone number at the bottom: Try again with the note "no phone number, no other text".
+
+### Step 4: Upload under conventional names
+
+```
+upload_ad_creative({ source_url: <asset url>, angle_id, icp_id,
+  name: "roof_replacement_after_the_hail_timely_local_calendar_punch_4x5_v1.png" })
+# ... one per render; the 9:16 versions end _9x16_v1
+```
+
+### Step 5: Build, file, close
+
+```
+create_meta_campaign({ name: "Roof_Replacement_Denver", objective: "OUTCOME_LEADS" })
+create_meta_adset({ name: "roof_replacement_denver_feeds", placement_formats: ["feeds"], ... })
+create_meta_adset({ name: "roof_replacement_denver_reels", placement_formats: ["stories_reels"], ... })
+create_meta_ad({ creative_ids: [<five 4:5 ids>], ... })   # one ad per creative, named after its file
+create_meta_ad({ creative_ids: [<five 9:16 ids>], ... })
+verify_meta_build({ adset_id })                            # for each ad set
+move_to_folder({ entity: "creative", ids, folder_name: "roof_replacement_denver", brand_id })
+```
+
+The ad body (blank line between paragraphs) comes from the library's winners, or new lines saved with `create_copy_lines`, each rationale starting `hook: <hook_type>.`. Close with the one switch: the campaign, paused, in Meta Ads Manager.
+
+---
+
+## 16. "UGC videos for my mortgage brokerage"
+
+> **User:** "Can you make UGC videos for our mortgage brokerage? Someone talking to camera."
+
+Read [CREATIVE.md](./CREATIVE.md) section 10 first.
+
+### Step 1: Say what granvl makes
+
+> granvl doesn't make AI presenter videos: an AI person talking about your brokerage would read as a fake client. Two things I can do: write a short script and shot list that you or a broker films on a phone (I file and test the takes), or make a faceless 9:16 explainer with narration and captions. Which would you like?
+
+> **User:** "The script. Our brokers will film it."
+
+### Step 2: Category first
+
+Mortgages are `CREDIT_LENDING`: confirm it with the user. On Meta it becomes a special ad category (the audience is fixed). In the script: no rate unless the user gives the rate, the APR and the terms; no "approved" or "guaranteed"; the licence line exactly as their regulator requires it. Ask for that wording.
+
+### Step 3: The kit, one concept (`compare_first`)
+
+```
+HOOK (0-3 s), film all three, straight to camera:
+  question_situation: What actually changes when a fixed mortgage term renews?
+  timely_local:       Fixed terms signed in 2022 start renewing next year. Here is what to look at first.
+  objection_first:    Comparing renewal options does not commit you to anything.
+
+PROBLEM (3-10 s): [a line in customers' own words, from the research report's customer voice]
+
+HOW IT WORKS (10-25 s): You answer a few questions on our site. A broker calls you back
+  and goes through the options with you.
+
+CTA (last 5 s): Tap below to start.
+
+REQUIRED: I'm [name], a mortgage broker with [brokerage]. [Licence line, exactly as given.]
+
+SHOTS: selfie at eye level near a window; the office or paperwork; the quiz on a phone.
+DELIVERY: phone vertical, quiet room, one line per take, captions added in the phone's editor.
+```
+
+Never a line that poses as a client, and never a result they can't document.
+
+### Step 4: File the takes
+
+```
+start_creative_upload({ filename: "mortgage_renewal_compare_first_question_situation_ugc_9x16_v1.mp4", bytes, sha256, mime: "video/mp4" })
+# PUT the file to upload_url, then:
+finish_creative_upload({ storage_key, filename, sha256, mime, angle_id, icp_id, testing_flow_id })
+# ... the same for the timely_local and objection_first takes
+```
+
+### Step 5: Test the hooks
+
+One testing flow for the angle (`create_testing_flow({ name: "mortgage_renewal_compare_first", copy_source: "winners", ad_format: "one_per_creative", ... })`, in a campaign declared `ad_category: CREDIT_LENDING`): the same copy on all three, so the hook is the only change. Judge on granvl's leads, qualified leads where a rule exists, then `save_learning` on the lander variant with the hook types compared.
 
 ---
 

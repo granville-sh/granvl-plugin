@@ -7,18 +7,21 @@ Microsoft Advertising (Bing + Yahoo + DuckDuckGo + Edge/Windows surfaces) is the
 ## What transfers 1:1 from the Google playbook
 
 - The three bidding recipes (Max Clicks + ceiling → launch default; Manual/Enhanced CPC; Max Conversions only after the user confirms a UET conversion goal with volume — `confirm_conversion_tracking: true`, never set it unprompted).
-- STAG structure: one theme per ad group, phrase/exact keywords, one lander per theme, everything lands PAUSED (you may pause, never enable).
+- STAG structure: one theme per ad group, phrase/exact keywords, one lander per theme.
+- The one-switch status rule, same as Google: a new campaign is created **Paused** and is the switch, and the ad groups, ads and keywords you build inside it go in **Active**; a new ad group in an old campaign (active, has ever delivered, or not granvl's) is created **Paused** and becomes the switch; an ad or keyword added to an existing ad group that is not provably new and off is **Paused**. Microsoft has no synchronous lifetime-delivery read, so its delivery history is granvl's synced warehouse. You may pause, never enable.
 - RSA copy limits are IDENTICAL (3–15 headlines ≤30 chars, 2–4 descriptions ≤90 chars) — reuse the Google copy spread verbatim on the first provide.
 - Plain `final_url`s — the campaign-wide Microsoft UTM suffix ({CampaignId} macros) is applied automatically.
 - The budget guardrail: `daily_budget_usd` (and any bid) is capped at min(workspace admin's cap, granvl's **$200/day** platform ceiling) before any write.
 
 ## The build
 
-`create_microsoft_search_campaign` → `create_microsoft_ad_group` (keywords) → `create_microsoft_search_ad` → `get_tracking_health` → hand the user the "activate in Microsoft Ads when ready" checklist.
+`create_microsoft_search_campaign` → `create_microsoft_ad_group` (keywords) → `create_microsoft_search_ad` → `get_tracking_health` → tell the user which ONE switch to flip in Microsoft Ads (`status_decision.off_switch`).
 
-1. **`create_microsoft_search_campaign`** — PAUSED Search campaign: daily budget (guardrailed), country targeting, chosen bidding strategy (default Maximize Clicks). The campaign is the single spend gate — the user activates in Microsoft Ads.
+1. **`create_microsoft_search_campaign`** — PAUSED Search campaign: daily budget (guardrailed), country targeting, chosen bidding strategy (default Maximize Clicks). It is the one switch: the user turns it on in Microsoft Ads.
 2. **`create_microsoft_ad_group`** — the ad group + its keywords, phrase/exact preferred. `add_microsoft_keywords` extends a theme later (same-theme only; BROAD needs `allow_broad_match: true` after an explicit user choice).
-3. **`create_microsoft_search_ad`** — the RSA: 3–15 headlines (≤30 chars), 2–4 descriptions (≤90 chars), PLAIN `final_url` (the UTM suffix is automatic).
+3. **`create_microsoft_search_ad`** — the RSA: 3–15 headlines (≤30 chars), 2–4 descriptions (≤90 chars), PLAIN `final_url` (the UTM suffix is automatic). `copy_warnings` in the result is granvl's offline copy review for Microsoft and the ad category (rate and APR claims need the full terms on the page, healthcare copy must address adults, editorial rules, the landing-page disclosures for credit and lending); the ad is built either way, so read them to the user and fix the copy where they apply.
+
+Names follow SKILL.md "Naming": the campaign in Title_Case with underscores (`AC_Repair_Phoenix_Search`), ad groups in snake case (`ac_repair_phoenix`). A name off the convention is created as given and comes back with `naming_note`.
 
 ## LinkedIn targeting (the B2B lever)
 
@@ -69,6 +72,10 @@ create_microsoft_search_campaign {
 ```
 
 `set_microsoft_location_targeting` is **additive** — it adds criteria, so *removing* an existing target is still a Microsoft Ads UI job. Setting `location_intent` on a campaign that already carries one fails (Microsoft adds a default); change that one in the UI.
+
+## Restricted ad categories on Microsoft
+
+Declare `ad_category` (NONE included; you classify the offer, SKILL.md "Restricted ad categories") on `create_microsoft_search_campaign` unless the brand or the funnel of `landing_page_url` already declares one; tighten it later with `update_microsoft_campaign`. Microsoft's rule is broader than Google's and has no country limit: ads for housing, employment, insurance (health insurance included), credit and other financial services must not be targeted by ZIP code, age, gender or language, so granvl refuses `PostalCode` targets for those categories (`search_microsoft_locations` marks them with `restricted_for`) and bans income targeting for financial and insurance ads. Microsoft prohibits political ads; granvl won't build them. Debt relief needs Microsoft's Financial Services Advertising program approval, and lead generators may only run comparison ads; addiction recovery is US-only, needs LegitScript, and Microsoft doesn't allow lead generation ads for it. granvl refuses both when the funnel sends its leads to a lead-distribution destination. Gambling and dating need Microsoft's licence check / pre-approval, confirmed by an Owner or Admin in granvl (`attestations_needed`). Full rules: SKILL.md "Restricted ad categories".
 
 ## Microsoft differences worth knowing
 

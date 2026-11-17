@@ -4,6 +4,8 @@ The full authoring guide for variant HTML: form wiring, quizzes, embeds, styling
 
 > **Two things the user will never ask for but always needs:** (1) every lead-capture funnel ends on a real thank-you page — author a proper TY variant and point forms at `_next="{{THANK_YOU_URL}}"`; (2) test the funnel end to end before calling it done (walk each page, one live test submit, confirm the TY redirect + delivery + `get_funnel_stats`). Both are hard rules in SKILL.md.
 
+> **File what you build, unasked.** When the funnel is built (and published, if this build publishes), put it in its brand's campaign folder: create it with `brand_id`, then `move_to_folder { entity: "funnel", ids: [funnel_id], folder_name: "<offer>_<market>", brand_id }` (reuses a same-named folder, creates it only when there is none; never move a funnel the user already filed). Its pages and variants live inside it, so they are filed with it. Details per asset in SKILL.md "File a brand's assets as you build them".
+
 > **Start from a template when one fits.** Before building a funnel from scratch, call `list_templates` — granvl ships conversion-tested starting points (quiz flows, landers). `create_funnel_from_template` clones one into the workspace; then adapt copy/brand/images with `update_variant` and rewire the forms per this guide. Bespoke builds are for when no template matches.
 
 ---
@@ -894,7 +896,7 @@ The target page MUST be the same type as the source's page (LANDING→LANDING, Q
 **Cross-funnel funnel duplication** — _"clone Sarah's whole insurance funnel for our new vertical"_:
 
 ```
-duplicate_funnel({ funnel_id, name: "Spring promo — pivoted from insurance" })
+duplicate_funnel({ funnel_id, name: "spring_promo_pivoted_from_insurance" })
 ```
 
 Copies every page + every variant **and the whole funnel setup**: destinations with their field maps and fallbacks, declared form fields, the qualification rule, phone / state formats, address autocomplete, validation and TrustedForm toggles, cookie banner, stats settings. Status: DRAFT. Source's domain reference is preserved — you'll need to rename slugs OR archive the source before publishing the duplicate, or the publish-time slug-conflict check rejects.
@@ -952,14 +954,14 @@ When a funnel has a qualification rule, you can route qualified vs. unqualified 
 # Funnel already has a qualification rule. Add a second TY page for unqualified leads:
 create_page({
   funnel_id,
-  name: "Thank you — qualified",
+  name: "thank_you_qualified",
   slug: "thanks",
   type: "THANK_YOU",
   qualification_audience: "qualified"
 })
 create_page({
   funnel_id,
-  name: "Thank you — unqualified",
+  name: "thank_you_unqualified",
   slug: "thanks-unqualified",
   type: "THANK_YOU",
   qualification_audience: "unqualified"

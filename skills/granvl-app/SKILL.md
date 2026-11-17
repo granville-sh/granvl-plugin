@@ -14,10 +14,10 @@ You are operating against an **AI-native landing page platform**. The user has c
 `tools/list` does not show every tool. What you see depends on the workspace:
 
 - **Core tools** (funnels, pages, variants, domains, brand kit, delivery, stats, learnings, workspace context, credits) — always listed.
-- **Ad-platform tools** (`create_meta_campaign`, `create_google_search_campaign`, `create_microsoft_search_campaign`, keyword / audience / location lookups, creatives, testing flows) — listed once the workspace has an ad account connected on the dashboard's Ads page, or when the MCP URL carries `?tools=all`.
+- **Ad-platform tools** (`create_meta_campaign`, `create_google_search_campaign`, `create_microsoft_search_campaign`, `create_tiktok_campaign`, keyword / audience / location lookups, creatives, testing flows) — listed once the workspace has an ad account connected on the dashboard's Ads page, or when the MCP URL carries `?tools=all`.
 - **Staff helpers** — staff only; you will never need them.
 
-So: if the user asks for a Meta / Google / Microsoft campaign and you do not see those tools, **do not say granvl can't do it**. Step zero is connecting the ad account (Settings → Ads, or the Ads page) — tell the user that, then reconnect / refresh the tool list. A tool you were not shown still runs if you call it by name, so calling `create_meta_campaign` on a workspace that just connected works even before the list refreshes. `get_ad_data_status` tells you which platforms are connected.
+So: if the user asks for a Meta / Google / Microsoft / TikTok campaign and you do not see those tools, **do not say granvl can't do it**. Step zero is connecting the ad account (Settings → Ads, or the Ads page) — tell the user that, then reconnect / refresh the tool list. A tool you were not shown still runs if you call it by name, so calling `create_meta_campaign` on a workspace that just connected works even before the list refreshes. `get_ad_data_status` tells you which platforms are connected.
 
 The skill itself is the same shape: `get_skill` returns SKILL.md plus an index of resource files; fetch a resource with `get_skill({ file: 'resources/META-ADS.md' })` the moment a task needs it.
 
@@ -36,11 +36,13 @@ This file holds the rules that always apply. Task-specific depth lives in resour
 - **Before any Meta campaign work** → STOP and read [resources/META-ADS.md](./resources/META-ADS.md).
 - **Before any Google Ads work (Search or Demand Gen)** → STOP and read [resources/GOOGLE-ADS.md](./resources/GOOGLE-ADS.md).
 - **Before any Microsoft Ads work** → STOP and read [resources/MICROSOFT-ADS.md](./resources/MICROSOFT-ADS.md).
+- **Before any TikTok Ads work** → STOP and read [resources/TIKTOK-ADS.md](./resources/TIKTOK-ADS.md).
 - **Before any work for a Shopify / ecommerce customer** (pre-sell pages that click out to a store, store revenue / margin / attribution questions) → STOP and read [resources/SHOPIFY.md](./resources/SHOPIFY.md).
 - **Before deep tool-arg / schema / error questions** → read [resources/REFERENCE.md](./resources/REFERENCE.md).
 - **Before customer/ICP/offer research or writing copy** → read [resources/COPYWRITING.md](./resources/COPYWRITING.md). Use the bounded strategy/copy brief tools when available; preserve Product + ICP + Angle + CopyLine lineage.
 - **Before analyzing performance or proposing tests** → read [resources/OPTIMIZATION.md](./resources/OPTIMIZATION.md).
 - **When the user EXPLICITLY asks for a dashboard / report / command center** → read [resources/DASHBOARDS.md](./resources/DASHBOARDS.md) and build it locally with the granvl dashboard kit (`resources/dashboard-kit/`) — never from scratch, never with a chart framework. Dashboards are strictly user-initiated: do NOT build one, or offer to build one, as a side effect of other work.
+- **Before making a set of ad creatives** (static images, videos, a UGC script the advertiser films) → read [resources/CREATIVE.md](./resources/CREATIVE.md).
 - **For golden-path conversation scripts** → read [resources/EXAMPLES.md](./resources/EXAMPLES.md).
 
 ---
@@ -140,6 +142,7 @@ granvl can run image generation, video generation, and cited web research for th
 - **`generate_image`** `{ brief, model?, reference_asset_ids?, use_product_images?, aspect_ratio?, resolution?, funnel_id? }` (the brand kit's product images are attached as references by default — set them once with `update_brand_kit` `product_image_asset_ids`) → a workspace asset (id + CDN URL) you can drop into variant HTML or push as an ad creative. **Only the brief, your chosen reference assets, and the settings reach the provider** — nothing from the workspace rides along, so put everything the image needs in the brief (brand colours, product, style). Contact details and credential links are stripped.
 - **Where images get rendered depends on your host.** If you are ChatGPT or Codex (an OpenAI client), you have your own image generation: render the composed prompt with it, then `upload_image` the result so it lives in the workspace — do NOT spend granvl credits on `generate_image`. If you are Claude, Grok, or any client without native image generation, render with `generate_image` on granvl credits. Either way the brief comes from `compose_creative_brief` first, and the uploaded or generated asset shows in the creative-review card. Video is granvl on every host (below).
 - **Ad creative starts from the library.** For any static image ad (never a video — these are not video templates): `list_creative_formats` (on MCP Apps hosts a gallery card — the user selects up to 10 formats and taps **Generate N images**, one chat message naming them and maybe a concept: an instruction to render one image per format without confirming each, as above; or opens one and taps “Use this format”, a message naming just it; other hosts get the previews inline. Either way ask the user which ones they like, or pick 3–5 that fit the offer's awareness level and the brand's tone; it pages 20 at a time and `by_category` says what else exists — filter by `category` Awareness | Conversion | Punch & Mockup or `awareness`, and page with `offset`, before saying the library lacks something), `get_creative_format` for the full brief, write the concept yourself (angle, exact headline, supporting line, only verified facts), then `compose_creative_brief` → one render-ready prompt. Render it with `generate_image` on granvl credits, or with your own image tool and `upload_image` the file. Vary angles AND formats across a set; never ten versions of one idea.
+- **A set starts from concept cards; read [resources/CREATIVE.md](./resources/CREATIVE.md) first.** One card per concept (angle, hook type, awareness, format and aspect, exact on-image text, verified facts, category notes, name), shown to the user before any credits are spent. Before a render becomes a creative, check it: the words match, nothing invented (phone numbers, URLs, handles, licence numbers, seals, badges, star ratings), the wordmark and product match the brand kit, the aspect fits the placement (4:5 for Meta feeds, 9:16 for Stories and Reels). Then upload it under its conventional name (see "Naming") with `angle_id` / `icp_id`.
 
 ### Video
 
@@ -153,6 +156,8 @@ granvl can run image generation, video generation, and cited web research for th
 - **Variants and edits are cheap.** `create_video_variant` (a new hook in beat 1, CTA, style or caption preset) reuses every unchanged still and voice clip — three hooks on one body cost one body plus three hooks; `update_video_beat` fixes one beat and re-renders only what it touches; `render_video { caption_preset }` on a finished run re-renders with render credits only (`list_caption_presets { run_id }` animates the five styles on the video's own first line). Beat edits and same-look variants keep the look approval (a new `style_id` gets its own look check), so their `render_video` has no review pause and confirms the remaining cost itself: above 20 credits it returns `needs_confirmation` — ask, then call again with `confirm: true` and `max_credits: suggested_max_credits`. `skip_look_check: true` does the same for re-rendering a look the user already approved; never on a new look. Stills pass a vision critic and are redrawn when they show text or broken anatomy.
 - **ChatGPT / Codex (native image generation): don't spend granvl credits on the stills.** `create_video_storyboard` returns `still_prompts` (the exact prompt per beat); render each with your own image model at the storyboard's aspect, `upload_image` it, attach the ids with `update_video_beat { still_asset_id }`, then `render_video` — only the critic review, the voice and the render use credits.
 - **One raw clip: `generate_video`** `{ model, brief, first_frame_asset_id?, reference_asset_ids?, duration_seconds?, aspect_ratio?, resolution?, audio?, funnel_id? }` → a `job_id` — only when the user explicitly wants a single Seedance / Veo shot (no narration, captions, music or template look). Poll **`poll_video_generation`** `{ job_id }` every ~20 seconds until `status` is `completed` (the card polls it too; the clip is charged once, on completion — a failed or expired job is free). Tell the user it takes a minute or three.
+- **UGC or a talking-head video:** granvl does not make AI presenter videos. Offer the film-it-yourself kit (granvl writes the script, three hooks and the shot list; the advertiser films it on their phone; granvl files and tests it: CREATIVE.md section 10) or a faceless 9:16 storyboard video. Never present an AI face or voice as a customer or as the advertiser, and never script anyone to pose as one.
+- **Say numbers in words.** A beat's `line` is read and captioned exactly: the figure goes in `overlay`, the words in `line` ("That is about twelve hundred dollars a year."), and phone numbers go on the end card. Video lengths and raw-clip briefs: CREATIVE.md sections 4 to 6.
 
 ### Research and campaign planning
 
@@ -191,14 +196,14 @@ Granvl is the **persistent warehouse for the user's historical ad-account data**
 2. Granvl syncs campaigns, spend, creatives, and search evidence server-side into the warehouse.
 3. Agents answer historical performance, optimization, and analytics questions only from Granvl reads. If a read is empty, stale, or failed, call the data-status tool and report its exact reason and remedy. **Never fall back to a live platform read or agent ETL for history.**
 
-Live platform connections remain available for an explicitly approved CREATE workflow: account identity, pixels, conversion actions, interest/audience lookup, Keyword Planner discovery, and paused campaign writes. These calls are rate-limited and purpose-bounded; they are not a way around missing warehouse history.
+Live platform connections remain available for an explicitly approved CREATE workflow: account identity, pixels, conversion actions, interest/audience lookup, Keyword Planner discovery, and campaign writes under the one-switch status rule. These calls are rate-limited and purpose-bounded; they are not a way around missing warehouse history.
 
-Note on **Campaigns** (the granvl grouping hubs that link funnels + ad campaigns into one view): they are managed on the dashboard (`/dashboard/campaigns`) — there is no MCP tool for creating or linking hubs. When a user asks to "group" or "organize" funnels with their ad campaigns, point them there.
+Note on **Campaigns** (the granvl grouping hubs that link funnels + ad campaigns into one view): `create_campaign_hub` / `update_campaign_hub` build and link them (see REFERENCE.md "Campaign hubs"); the dashboard's `/dashboard/campaigns` shows them. Offer a hub after a build, never create one unasked. Folders are a different thing: see "File a brand's assets" below for filing everything you build.
 
 ### Sync and action boundary
 
 - If history is unavailable, surface the connection/sync reason and send the user to the Ads connection or sync remedy returned by Granvl. Do not import history yourself.
-- Campaign creation and updates go through Granvl's guarded tools only. They enforce tenant scope, API quotas, budget limits, and paused defaults. When a guardrail refuses a request, relay the limit to the user; do not look for another way to make the same change.
+- Campaign creation and updates go through Granvl's guarded tools only. They enforce tenant scope, API quotas, budget limits, and the one-switch status rule. When a guardrail refuses a request, relay the limit to the user; do not look for another way to make the same change.
 - When building pages/links, follow the workspace UTM convention (`utm_source`, `utm_campaign`, `utm_adgroup` at minimum) so the warehouse can join spend to first-party outcomes.
 
 ### Answering spend + optimization questions
@@ -214,16 +219,35 @@ The decision tree below routes each question to its tool. Universal habits:
 
 ## Paid ads — universal invariants (all platforms)
 
-granvl can build ad campaigns on Meta, Google (Search + Demand Gen), and Microsoft (Bing) directly from the conversation. The platform tools appear in your list once an ad account is connected (see "Your tool list is tiered" above) — if they are missing, connecting the account is step zero. These invariants hold on EVERY platform (server-enforced — don't fight them):
+granvl can build ad campaigns on Meta, Google (Search + Demand Gen), Microsoft (Bing) and TikTok directly from the conversation. The platform tools appear in your list once an ad account is connected (see "Your tool list is tiered" above) — if they are missing, connecting the account is step zero. These invariants hold on EVERY platform (server-enforced — don't fight them):
 
-- **Everything is created PAUSED.** You may pause campaigns, but never enable — going live is always the human's action in the platform's own ads manager. There is deliberately no activate tool. Close every build by telling the user where to flip the switch.
+- **One switch, always — the status rule (server-decided, 2026-11-09).** There is exactly ONE paused switch above anything granvl creates, and granvl never enables anything inside something that is or has been live:
+  - **A new campaign is always created PAUSED.** It is the switch.
+  - **An ad set / ad group created inside a campaign that is new and off** (paused right now, created by granvl, never delivered) is created **ACTIVE** (Google ENABLED, Microsoft Active), and so are the ads and keywords inside it. The human flips only the campaign to go live.
+  - **An ad set / ad group created inside any other campaign** (live, has ever delivered — even if paused now — not created by granvl, or anything granvl cannot read) is created **PAUSED** and becomes the switch; the ads and keywords you then create inside it go in **ACTIVE** behind it.
+  - **An ad or keyword added to an existing ad set / ad group** that is not provably new and off is created **PAUSED**.
+  - The server decides from what it reads at creation time (the platform's live status, granvl's own creation record, delivery history); no argument can ask for ACTIVE, and any check that fails or cannot be read means PAUSED. Every create result carries `status` / `ad_status`, `status_reason` and `status_decision` (`off_switch` = the switch to flip) — relay them, and close every build by telling the user exactly which switch to flip and where.
+  - **TikTok is the exception: every level is created PAUSED** (campaign, ad group and ad, each read back from TikTok and paused again if TikTok lists it otherwise). There is no one-switch rule there, so the user switches on the campaign, its ad group and its ads in TikTok Ads Manager; every TikTok create result says so in `go_live`.
+  - There is still **no tool that activates, enables or unpauses anything**. You may pause; going live is always the human's action in the platform's own ads manager. The auto-test engine and the dashboard's Meta launcher still create everything paused.
+- **Names follow one convention** (see "Naming" below): campaigns `Title_Case_With_Underscores`, everything else `lowercase_with_underscores`, never an em or en dash. The server turns an em or en dash in a name into a hyphen on the way in, writes the name otherwise as passed, never renames what already exists, and flags a campaign / ad set / ad group / ad name that is off the convention with `naming_note`.
 - **Budget guardrail:** daily budgets (and bids) are capped at min(the workspace admin's cap, granvl's **$200/day** platform ceiling) before any write. An over-cap request returns the cap in the error — relay it, NEVER work around it.
 - **Budget raises are capped at 20% per change** (platform ceiling; an account's guardrail can only be lower), and every raise is a proposal a workspace member approves — you never apply one. Scaling a winner is a series of ≤20% steps, each approved; a bigger jump is the user's to make in the platform's Ads Manager. Do not split one raise into several proposals to get around it.
 - **Plain URLs, never pre-tagged:** granvl applies each platform's UTM template automatically so spend joins first-party conversions. Every destination URL you provide stays plain.
 - **Pages before ads:** final URLs on granvl domains must be LIVE — publish first.
 - **BROAD match keywords require `allow_broad_match: true`** — set only after the user explicitly chooses broad despite your warning.
 - **Max Conversions bidding requires `confirm_conversion_tracking: true`** — set only after the USER confirms conversion tracking is wired (Google: GA4-imported conversion action; Microsoft: a UET goal with volume). Never set it unprompted.
-- **Regulated verticals on Meta need `special_ad_category`** (financial / housing / employment / political) — ask if the offer looks like one. On such a campaign Meta fixes the audience, and granvl refuses any adjustment before writing: no location exclusions (target provinces / states with `region_keys` instead), age stays 18–65+, gender `all`, no `interest_ids`.
+- **Restricted ad categories (all platforms).** Every build carries an `ad_category`: CREDIT_LENDING, BANKING_INVESTING, INSURANCE, HEALTH_INSURANCE, DEBT_RELIEF, HOUSING, EMPLOYMENT, HEALTH, ADDICTION_TREATMENT, POLITICAL, GAMBLING, ALCOHOL, DATING, LOCAL_SERVICES_VERIFIED (locksmith, garage door) or NONE. **You classify the offer and declare it; granvl does not run its own AI classifier.**
+  - **Decide it before the first campaign build for an offer.** Read the offer research, the product and the live landing page, then pick what the advertiser sells (not words in passing: "no credit card required" on a software page is NONE): credit and lending, mortgages and financed or leased solar included → CREDIT_LENDING; banking and investing → BANKING_INVESTING; insurance → INSURANCE; health insurance, Medicare and ACA included → HEALTH_INSURANCE; debt relief, credit repair included → DEBT_RELIEF; housing, cash-offer home buying and rentals included → HOUSING; employment and recruiting → EMPLOYMENT; health (clinics, med spa, weight loss, telehealth) → HEALTH; addiction treatment → ADDICTION_TREATMENT; political → POLITICAL; gambling → GAMBLING; alcohol → ALCOHOL; dating → DATING; locksmith or garage door → LOCAL_SERVICES_VERIFIED; anything else → NONE. When unsure between two, pick the stricter. Tell the user the pick and the reason in one line ("Declaring HOUSING: the page buys houses for cash.").
+  - **Pass `ad_category` on every campaign create** (`create_meta_campaign`, `create_google_search_campaign`, `create_google_demand_gen_campaign`, `create_microsoft_search_campaign`, `create_tiktok_campaign`), NONE included. On TikTok it is recorded, but granvl holds no verified TikTok category rules yet, so it limits nothing there and the result says so. The schema leaves it optional, the server does not: it is inherited only when the ad account's brand or the funnel of `landing_page_url` already declares one (`ad_category.inherited_from` says so). Undeclared, the build is refused before anything is created once enforcement is on; today it goes ahead with `ad_category.declared: false` and the same text as a warning. Then offer to save it on the funnel (`update_funnel` with `ad_category`; `create_funnel` takes it too) so later builds inherit it. Ad sets, ad groups, ads and audiences read the campaign's stored category and don't need it.
+  - **The keyword cross-check only tightens.** granvl checks the landing page, the research, the product, your keywords and ad copy against a word list (free, no model). A declared NONE on a page that plainly says "mortgage" builds as CREDIT_LENDING, and `ad_category.warnings` / `ad_category.detection` show the evidence. You can't pass a looser value to get around it; if the check is wrong, tell the user a workspace Owner or Admin can dismiss it in granvl's dashboard, and don't rewrite the page or the copy to dodge it. The platform makes the final call.
+  - On Meta it becomes `special_ad_category` (pass `ad_category` and leave `special_ad_category` out; if you pass both they must agree). On Google and Microsoft it limits targeting:
+  - **Housing, employment, credit, banking, debt relief:** no age, gender, parental or marital targeting and no ZIP codes (Canadian FSAs like M5J are fine on Google; `search_google_locations` / `search_microsoft_locations` mark postal results with `restricted_for`). Microsoft also restricts insurance this way and bans income targeting for financial and insurance ads.
+  - **Insurance and health insurance on Google:** age and gender targeting stay available (Google doesn't name insurance), but the category is sensitive: be aware of it and keep the targeting justified by the offer.
+  - **Debt relief, health, addiction, gambling, alcohol** are sensitive-interest categories on Google: Customer Match, remarketing lists, lookalikes and optimized targeting aren't supported and Demand Gen may not serve. Lists and lookalikes are the customer's to build in their own account; granvl attaches what exists, relays the platform's own answer if it refuses, and never uploads lists.
+  - **Refused:** political ads on Google and Microsoft; credit repair on Google; bail bonds and third-party tech support; US debt relief on Google unless an Owner or Admin confirmed non-profit credit counselling status; debt-relief and addiction lead generation on Microsoft.
+  - **Certification categories** (Google US health insurance, LegitScript addiction treatment, Google locksmith / garage door verification, gambling, dating) return `attestations_needed`: tell the user a workspace Owner or Admin confirms it in granvl, at Settings → Compliance. You can't confirm it.
+  - You may tighten a category but never loosen one (a looser value is ignored with a warning); the user sets a brand's or funnel's category in its Ad category setting, and only an Owner or Admin can loosen one or dismiss a detected one there. Every result carries `ad_category { value, source, restrictions, warnings, attestations_needed, detection }` (campaign creates add `declared` and `inherited_from`): read the warnings to the user. The Google and Microsoft ad tools also return `copy_warnings` (a copy review for the platform and the category, plus the landing-page disclosures for credit and lending): read them to the user and fix the copy where they apply; the ad is built either way. While the roll-out switch is on warn, would-be refusals come back as warnings starting "Not enforced yet"; treat them as refusals. When granvl refuses, relay the reason and don't look for another route. This is not legal advice, and the platform makes the final call.
+  - On a Meta special-ad-category campaign Meta fixes the audience, and granvl refuses any adjustment before writing: no location exclusions (target provinces / states with `region_keys` instead), age stays 18–65+, gender `all`, no `interest_ids`.
 - **Microsoft limits:** negative keywords are PHRASE/EXACT only; country targeting currently US / CA / GB / AU only.
 - **After a guarded platform write,** rely on Granvl's audited write path and next warehouse sync. Do not manually re-record the entity.
 
@@ -232,6 +256,7 @@ Per-platform playbooks and build flows are a **required read** — before creati
 - **Meta (Facebook / Instagram)** — Guided Campaign Build (campaign → ad set → ad), creatives, CTAs, copy rotation, Advantage+ enhancements, special ad categories → **read [resources/META-ADS.md](./resources/META-ADS.md) first.**
 - **Google Search + Demand Gen** — STAG / SANG playbooks, bidding recipes, keyword research, audiences, the weekly negatives loop → **read [resources/GOOGLE-ADS.md](./resources/GOOGLE-ADS.md) first.**
 - **Microsoft Ads (Bing) Search** — Google's sibling with cheaper clicks; UET tracking; platform differences → **read [resources/MICROSOFT-ADS.md](./resources/MICROSOFT-ADS.md) first.**
+- **TikTok** — video-first, creative-led; every level created paused; plain landing URLs; library videos only → **read [resources/TIKTOK-ADS.md](./resources/TIKTOK-ADS.md) first.**
 
 ---
 
@@ -266,6 +291,8 @@ several client workspaces                  switch_workspace        (by id or nam
                                            create_variant       (variant HTML on the relevant page)
                                            [user reviews preview]
                                            publish_funnel       (activates + bakes HTML)
+                                           move_to_folder       (file the funnel in the brand's
+                                                                 campaign folder — unasked)
                                            # Don't search for an existing funnel
                                            # named like X — see "New funnel vs.
                                            # new variant" rule below.
@@ -303,6 +330,12 @@ several client workspaces                  switch_workspace        (by id or nam
                                            # Folders are PER BRAND: provide the brand the items live in (default
                                            # brand when omitted); items from another brand are skipped, and a
                                            # funnel that changes brand leaves its old brand's folder.
+(after building anything for a brand)    → file it, unprompted: list_folders → move_to_folder
+                                           (funnels, creatives, copy lines, strategy),
+                                           move_creatives_to_brand first for a non-default
+                                           brand's creatives, research folders via
+                                           create_research_folder / update_research_document.
+                                           See "File a brand's assets as you build them".
 
 "Single page that links to <off-site>"   → create_funnel({ funnel_type: "click_through" })
 "Just one page, click out to <X>"          # no ask needed — user named the shape
@@ -322,20 +355,26 @@ several client workspaces                  switch_workspace        (by id or nam
 "Which lander variant wins ad X?"        → get_ad_to_lander_performance  (ad→variant, Wilson-gated winner)
 "Which of these 2 ad sets is better?"    → compare_ad_sets    (metrics + AI verdict, names the layer)
 "Which ads are healthy / need attention?"→ get_ad_health      (0–100 self-benchmark score, worst-first)
+"Is Google rejecting or limiting ads?"   → get_ad_health      (`policy`: Google's flags + verification)
 "Log a Shopify/Stripe sale back in"      → record_external_conversion  (idempotent on order id)
 
 "Build me a Meta / Facebook / Instagram  → read resources/META-ADS.md FIRST, then
  campaign"                                 the Guided Campaign Build:
                                            create_meta_campaign →
-                                           create_meta_adset → create_meta_ad.
-                                           Everything is created PAUSED (the human
-                                           activates in Ads Manager).
+                                           create_meta_adset → create_meta_ad →
+                                           verify_meta_build → file the creatives +
+                                           copy lines in the brand's campaign folder.
+                                           Campaign PAUSED = the one switch; ad sets
+                                           + ads in a NEW campaign go in ACTIVE
+                                           behind it (server-decided, see "One
+                                           switch"). Human flips the campaign.
 
 "Build a Google Search / Demand Gen      → read resources/GOOGLE-ADS.md FIRST
  campaign"                                 (STAG / SANG playbooks + the two
                                            3-step build flows): campaign →
-                                           ad group → ad. Always created PAUSED —
-                                           one switch to activate in Google Ads.
+                                           ad group → ad. Campaign PAUSED = the one
+                                           switch; ad groups / ads / keywords in a
+                                           NEW campaign go in ENABLED behind it.
                                            Research keywords FIRST with
                                            generate_keyword_ideas (volume + CPC
                                            from Keyword Planner) instead of
@@ -345,8 +384,17 @@ several client workspaces                  switch_workspace        (by id or nam
                                            create_microsoft_search_campaign →
                                            create_microsoft_ad_group →
                                            create_microsoft_search_ad. Same STAG
-                                           playbook as Google Search; always
-                                           created PAUSED.
+                                           playbook as Google Search; same
+                                           one-switch rule (campaign PAUSED).
+
+"Build a TikTok campaign"                → read resources/TIKTOK-ADS.md FIRST:
+                                           create_tiktok_campaign →
+                                           create_tiktok_ad_group →
+                                           list_tiktok_identities →
+                                           create_tiktok_ad (library videos) →
+                                           verify_tiktok_build. EVERY level is
+                                           PAUSED; the user switches all three
+                                           on in TikTok Ads Manager.
 
 "Build a pre-sell / advertorial page for   → read resources/SHOPIFY.md FIRST:
  my Shopify product"                        list_store_products → create_funnel
@@ -391,6 +439,13 @@ several client workspaces                  switch_workspace        (by id or nam
                                            # NEVER list_creative_formats (static images) or raw-clip prices
 "Just one raw clip (Seedance / Veo shot)" → list_capabilities → generate_video → poll_video_generation
                                            (only when the user explicitly wants a single raw clip)
+"Make N static ads for <offer>"           → read resources/CREATIVE.md FIRST → N concept cards → user approves
+                                           → per card: get_creative_format → compose_creative_brief (aspect_ratio)
+                                           → render → check the image → upload_ad_creative (conventional
+                                             name, angle_id, icp_id) → file them in the campaign folder
+"Make me UGC / a talking-head video"      → no AI presenter: the film-it-yourself kit (CREATIVE.md section 10:
+                                           script, three hooks, shot list) or a faceless 9:16 video (setup_video)
+                                           → their files: start_creative_upload → PUT → finish_creative_upload
 "Research <competitor / market / offer>"  → research_web           (cited; save to a research doc)
 "Make me a campaign for <offer>" (no doc) → list_research_documents → start_offer_research (estimate_only first; auto-starts under 250 credits)
                                            → quick_read now → poll_offer_research (the report is filed for you)
@@ -598,7 +653,19 @@ If the user picks shape 5 or 6, do one follow-up to confirm the page list before
 
 ### Never put the platform in the funnel _name_
 
-The platform belongs in the `platform` field **only** (it renders in its own column everywhere and is editable later). Name funnels after the **business / offer / angle**, never the traffic source. ✅ `name: "PerkPoint — Benefits Savings", platform: "META"` · ❌ `name: "PerkPoint — Meta — Benefits Savings"`. Applies to `update_funnel` renames, page slugs, and variant names too.
+The platform belongs in the `platform` field **only** (it renders in its own column everywhere and is editable later). Name funnels after the **business / offer / angle**, never the traffic source. ✅ `name: "perkpoint_benefits_savings", platform: "META"` · ❌ `name: "perkpoint_meta_benefits_savings"`. Applies to `update_funnel` renames, page slugs, and variant names too.
+
+### Naming
+
+One convention for every name you choose, in granvl and on the ad platforms (owner decision, 2026-11-10); it replaces every earlier naming rule. People search these names in Ads Manager, sort them in sheets and match them by eye, so they have to look alike.
+
+- **Campaigns:** Title_Case words joined by underscores: `Roof_Replacement_Storm_Season`, `Mortgage_Renewal_CA`.
+- **Everything else:** lowercase words joined by single underscores, with no spaces, hyphens or other punctuation: ad sets and ad groups, ads, creatives and their file names, audiences, copy-line batch labels, folders, testing flows, funnels, pages and variants, video run titles. `ad_set`, `ad_comic_video`, `roof_replacement_feeds`.
+- **Creatives and ads** are built from their parts in a fixed order: `{offer}_{angle}_{hook_type}_{format}_{aspect}_v{n}`, e.g. `roof_replacement_storm_season_timely_local_calendar_punch_4x5_v1`. The fields use underscores inside too, so the order is what keeps a name readable and sortable: keep every field, in this order. Write the aspect as `1x1`, `4x5`, `9x16`, `16x9` or `191x1`. A one-per-creative Meta ad takes its creative's file name as its name (more in [resources/CREATIVE.md](./resources/CREATIVE.md)).
+- **Audiences:** `{brand}_{icp}_{kind}_{theme}_v{n}`, the ICP left out for a brand-level audience: `acme_homeowners_search_roof_repair_v1`.
+- **Not names:** URL slugs keep hyphens, form field names follow the form contract below, headlines, ad copy, a page's `<title>` and research document titles are prose, and brand and workspace names are the business's own. None of them ever contain an em or en dash either.
+- **What exists keeps its name.** Never rename anything to fit the convention, and reuse an existing folder by the exact name it already has (`list_folders` first; `folder_name` matches the whole name).
+- **What the server does:** it turns an em or en dash in a campaign / ad set / ad group / ad name into a hyphen before it reaches Meta, Google, Microsoft or TikTok (names only, never ad copy) and writes the name otherwise as you passed it. A campaign / ad set / ad group / ad name off the convention comes back with `naming_note { given, suggested, note }`: keep a name the user chose, and use the convention for the next one. Names granvl makes up itself (launcher defaults, audience drafts, video variant titles) already follow it.
 
 ---
 
@@ -766,6 +833,35 @@ Every successful MCP tool call writes to the user-visible activity feed, and **y
 
 ---
 
+## File a brand's assets as you build them — without being asked
+
+Everything you create for a brand ends the build **filed in that brand's folders**: the user should open the Funnels, Creative, Copywriting, Strategy and Research pages and find the new work grouped under the campaign it belongs to, not loose at the top level. Do it as part of the build, unprompted, then say in one line what you filed where.
+
+**The convention**
+
+1. **Brand first.** Every asset belongs to the right brand before it goes in a folder (`list_brands`; ask which brand when there are several and the user did not say). Folders are **per brand**: a folder is only found or created inside the brand you pass, and items from another brand are skipped.
+2. **Then one campaign / offer folder inside the brand**, named after the campaign or offer by the naming convention (`mortgage_protection_ca`, `spring_promo`; see "Naming"). Use the **same folder name** on every table (funnels, creatives, copy, strategy), so one campaign reads the same everywhere.
+3. **Reuse before you create.** Check what exists first and reuse a folder under the exact name it has, whatever its style (`list_folders { kind, brand_id }`; research folders come back from `list_research_documents { brand_id }`). `move_to_folder` with `folder_name` already reuses a same-named folder on that table and creates it only when there is none.
+4. **Never move what the user already filed.** File only what you created in this build (or what the user asked you to file). An item that already sits in a folder stays there; a creative inside an auto-test bucket stays there too (a creative folder IS the auto-test's bucket, and moving it takes it out of the test).
+5. Folders are organizational only: they never change serving, tracking, stats or what an ad campaign runs.
+
+**The tools, per asset**
+
+| Asset | File it with |
+| --- | --- |
+| Funnel (its landing pages and variants live inside it, so filing the funnel files them) | Create it in the brand (`create_funnel` / `create_funnel_from_template` with `brand_id`; `update_funnel { brand_id }` re-homes one), then `move_to_folder { entity: "funnel", ids, folder_name, brand_id }`. |
+| Domain the funnel serves on | `move_domain_to_brand { domain_id, brand_id, move_funnels: true }` only when the domain sits in the wrong brand (confirm first; owner / admin only). |
+| Ad creatives | `upload_ad_creative` (and the direct upload) take no brand: a creative lands in the **default brand**. For another brand, `move_creatives_to_brand { ids, brand_id }` first, then `move_to_folder { entity: "creative", ids, folder_name, brand_id }`. Stamp `angle_id` / `icp_id` on upload. A creative uploaded with `testing_flow_id` is already filed in that auto-test's bucket. |
+| Copy lines | `create_copy_lines { brand_id, batch, lines }`, then `move_to_folder { entity: "copy_line", ids: copy_line_ids, folder_name, brand_id }`. |
+| Products, ICPs, angles | `move_to_folder { entity: "product" \| "icp" \| "angle", ids, folder_name, brand_id }` (the Strategy page's folders). |
+| Research documents | Reuse a research folder or `create_research_folder { name, brand_id, parent_id? }`, then create the document with `folder_id` (`create_research_document`) or move it with `update_research_document { document_id, folder_id }`. A report `start_offer_research` filed for you can be moved into the campaign folder the same way when it sits at the library root. |
+| Lead magnets | **No folder or brand tool over MCP**: a lead magnet is grouped by the domain it is served on. Host it on the brand's domain (`upload_lead_magnet` with that `domain` or `funnel_id`) and leave it there. |
+| Campaign hubs | Not a folder: **offer** to group the funnel with its ad campaigns (`create_campaign_hub`), never create one unasked. |
+
+Renaming or deleting a folder is dashboard-only.
+
+---
+
 ## What this skill does NOT cover
 
 - **Initial domain DNS setup** — the user adds the CNAME themselves; you verify after by polling `get_domain`.
@@ -785,7 +881,9 @@ For paid-ads strategy or general marketing unrelated to Granvl's product surface
 - Meta campaigns → [resources/META-ADS.md](./resources/META-ADS.md) **(required before any Meta build)**
 - Google Search / Demand Gen → [resources/GOOGLE-ADS.md](./resources/GOOGLE-ADS.md) **(required before any Google build)**
 - Microsoft Ads → [resources/MICROSOFT-ADS.md](./resources/MICROSOFT-ADS.md) **(required before any Microsoft build)**
+- TikTok Ads → [resources/TIKTOK-ADS.md](./resources/TIKTOK-ADS.md) **(required before any TikTok build)**
 - Shopify stores — pre-sell pages, store attribution, margin → [resources/SHOPIFY.md](./resources/SHOPIFY.md) **(required before any ecommerce work)**
 - Tool args, schema, serve runtime, error catalog → [resources/REFERENCE.md](./resources/REFERENCE.md)
 - A/B sizing, CRO patterns, diagnosis playbooks → [resources/OPTIMIZATION.md](./resources/OPTIMIZATION.md)
+- Ad creatives (concept cards, hooks, the image check, sizes, video scripts, UGC kits) → [resources/CREATIVE.md](./resources/CREATIVE.md) **(required before any set of creatives)**
 - Golden-path scripts → [resources/EXAMPLES.md](./resources/EXAMPLES.md)

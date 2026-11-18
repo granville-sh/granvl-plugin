@@ -467,6 +467,10 @@ The synced catalog (incl. products with no sales): id, title, handle, variants (
 
 Cost inputs behind contribution margin (defaults 2.9% + $0.30, shipping = what was charged, fallback COGS 0%). Unit costs come from Shopify's Cost per item via the product sync.
 
+#### `get_store_analytics` `{ days?, store_id? }`
+
+Storefront analytics counted by granvl's consent-gated storefront script (daily totals, no visitor data, no Shopify analytics permission), one store at a time: `current` / `previous` (`sessions`, `visitors` (once per browser day, summed), `pageViews`, `addToCartSessions`, `checkoutSessions`, `purchases`, `purchasesFromCountedVisitors`, `revenue`, `aov`, `conversionRate`, `addToCartRate`, `checkoutRate`, `checkoutCompletion`), `daily[]`, `funnel[]` (`count`, `ofSessions`, `ofPrevious`), `pages[]` (top 20: `path`, `label`, `views`, `sessions`, `share`), `insights[]`, `notes[]`, `definitions`, `collection { state: on|off|paused, firstDay, lastDay, script { installed, version, collects } }`, `range { countingFrom, partial, previousComparable }`, `status` (`not_ready` = try later). `days` ∈ 1 | 7 | 30 | 90 (default 30). With several stores and no `store_id`: `stores[]` and a message, nothing summed.
+
 #### `get_store_summary` also returns `experiments: { running, concludedLast30d }`
 
 ### Storefront A/B tests (read [SHOPIFY.md](./SHOPIFY.md) §5 first)

@@ -245,13 +245,25 @@ audience, never a promise for the next one.
 
 ---
 
-## 10. UGC the advertiser films
+## 10. UGC: a generated presenter, or the advertiser films it
 
-granvl does not make AI presenter videos: no AI person speaking to camera,
-and no AI face or voice presented as a customer or as the advertiser. For a
-lead-gen brand the strongest UGC is the owner, broker, agent or installer on
-their own phone. granvl writes it, they film it, granvl files and tests it.
-One kit per concept:
+Two ways to make UGC-style video, and the user picks:
+
+- **A generated presenter** (`setup_video { kind: 'ugc' }`, SKILL.md): a
+  made-up person talks to camera in a phone-selfie video with captions.
+  Quick, no filming. The person is always generated, never a real or famous
+  one and never a lookalike, with no photo of a person and no voice sample
+  anywhere. The presenter talks to the viewer about the offer; it never
+  speaks as a customer ("I saved $400"), as an expert ("as a doctor") or as a
+  named person at the business. The finished ad is marked as an AI presenter;
+  the user turns on the platform's AI label when they launch it. Script
+  craft: contractions, short sentences, numbers as words ("fifteen years"),
+  "Honestly," as a lead-in, one clip's worth per group of sentences, the call
+  to action last; the tool says the length limits.
+- **The advertiser films it** (below): for a lead-gen brand the strongest
+  UGC is often the owner, broker, agent or installer on their own phone.
+  granvl writes it, they film it, granvl files and tests it. One kit per
+  concept:
 
 1. **The script, 30 to 45 seconds:**
    - Hook (0 to 3 s): a line from the hook vocabulary, straight to camera.

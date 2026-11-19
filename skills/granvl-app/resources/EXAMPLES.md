@@ -1022,9 +1022,11 @@ The ad body (blank line between paragraphs) comes from the library's winners, or
 
 Read [CREATIVE.md](./CREATIVE.md) section 10 first.
 
-### Step 1: Say what granvl makes
+### Step 1: Offer both ways
 
-> granvl doesn't make AI presenter videos: an AI person talking about your brokerage would read as a fake client. Two things I can do: write a short script and shot list that you or a broker films on a phone (I file and test the takes), or make a faceless 9:16 explainer with narration and captions. Which would you like?
+> Two ways: I can make it with a generated presenter (a made-up person, not one of your clients or brokers, talking to camera about how it works; ad platforms ask you to label it as AI), or write a short script and shot list that you or a broker films on a phone (I file and test the takes). Which would you like?
+
+(A generated presenter is `setup_video { kind: 'ugc' }` with a draft presenter and script: SKILL.md. For a mortgage brokerage it still never speaks as a client or an adviser, and the script keeps to the category rules below.)
 
 > **User:** "The script. Our brokers will film it."
 

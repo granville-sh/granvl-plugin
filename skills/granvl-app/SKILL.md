@@ -73,9 +73,24 @@ If you got this skill through the granvl plugin, it updates with the plugin — 
 
 ---
 
+## Tool list freshness
+
+<!-- Maintainers: every PR that adds, renames or removes an MCP tool updates the date and the list below (public tools only: a tool listed only once ads or a store are connected would read as stale), then runs `pnpm build:plugin`. get_skill's `version` is a hash of these files, so the edit is the version bump. -->
+
+Tools last changed: **2026-11-18**. Recently added (always listed):
+
+- `update_domain_legal` (2026-11-18)
+- `create_workspace` (2026-11-02)
+
+On your first turn, alongside `get_workspace_context`, check these names against the tools you actually have. One missing means your connector loaded granvl's tool list before it shipped: tell the user once, in plain words, that granvl has new tools their connection hasn't loaded and ask them to refresh the granvl connector (claude.ai: Settings → Connectors → granvl → refresh, or remove and re-add it, then start a new chat; ChatGPT: the granvl connector's settings; Claude Code: restart the session). Then carry on with the tools you have: never block the task on it, and don't repeat it in the same conversation. If the request needs the missing tool itself, say this action needs the refresh and offer the dashboard path meanwhile (legal links: Settings → Domains → Manage → About).
+
+---
+
 ## START HERE — get your bearings every session
 
 **Before anything else — building, editing, advising — call `get_workspace_context`.** It returns the workspace's `granvl.md`: a CLAUDE.md-style memory file (business type, brands/domains in play, audience, voice, accumulated CRO learnings). Read it, follow it, keep it current with `update_workspace_context` (whole-file replace: read, modify, write the complete doc back). When it comes back `empty`, run the intake below and save the result before building (no workspace at all → the first case below). Then call `list_funnels`, and `get_brand_kit` for the domain you're about to touch.\*\* Together they tell you what's already live and what this customer looks and sounds like. Building without reading them is how a generic page happens.
+
+Same first turn: the **Tool list freshness** check above, once per conversation.
 
 Brand specifics — colors, fonts, logo, voice — live in the **brand kit**, per domain. Durable CRO findings live in **learnings** (`save_learning` / `list_learnings`), per funnel. Those two are your memory between sessions; keep them fed.
 
@@ -511,6 +526,10 @@ several client workspaces                  switch_workspace        (by id or nam
                                            [per-domain; serve route auto-injects on next
                                             render — no per-page code]
 
+"Add our privacy policy / terms links"    → update_domain_legal    (privacy_policy_url, terms_of_service_url,
+                                                                  business_legal_name; "/privacy-policy"
+                                                                  on the domain is fine)
+
 "Why's conversion dropping?"             → get_funnel_stats     (per-variant numbers)
                                            get_variant_history   (did conv rate move around an
                                                                   edit? series + edit markers)
@@ -711,7 +730,7 @@ These conventions are enforced by the serve pipeline. Violating them won't rejec
 - **HTML magnet page:** create a page with `type: "MAGNET"` and author the magnet itself as the variant (guide, checklist, video page — nicer on mobile than a PDF and A/B-testable). Link it from the TY page by its slug. MAGNET pages never count as a funnel step or a conversion, never get a form (validator warns `magnet_has_form`), and don't change click-through derivation.
 
 9. **Every lead-capture funnel ends on a working thank-you page — build it without being asked.** Assume the user won't think to ask; a form that dead-ends after submit reads as broken and drops the conversion redirect. Keep the auto-created `THANK_YOU` page, author a REAL variant on it (confirmation + what happens next — never leave the page empty or default), and point every form at `_next="{{THANK_YOU_URL}}"`. The only exception is `click_through` funnels, which have no form and no TY page by design.
-10. **Legal footer: never block a build on it.** If `get_funnel` → `legal.privacyPolicyUrl` is set, every variant links it in the footer; if it's null, build anyway and skip the footer links — NEVER ship a placeholder link (`#`, `/privacy`, example.com) and never stop a first build or preview to demand legal pages. The requirement lands at **custom-domain publish / paid-traffic time**: ad platforms reject landing pages without a discoverable privacy policy, and publish injects a plain fallback footer if the URLs exist but you omitted them. When the user moves to publish on a custom domain or run ads, that's the moment to have them add their URLs in Settings → Domains → Legal & compliance.
+10. **Legal footer: never block a build on it.** If `get_funnel` → `legal.privacyPolicyUrl` is set, every variant links it in the footer; if it's null, build anyway and skip the footer links — NEVER ship a placeholder link (`#`, `/privacy`, example.com) and never stop a first build or preview to demand legal pages. The requirement lands at **custom-domain publish / paid-traffic time**: ad platforms reject landing pages without a discoverable privacy policy, and publish injects a plain fallback footer if the URLs exist but you omitted them. When the user moves to publish on a custom domain or run ads, that's the moment to get their URLs: they add them in Settings → Domains → Manage → About, or they give them to you and you set them with `update_domain_legal` (a path like `/privacy-policy` on the domain is fine).
 
 ### Forbidden patterns
 

@@ -3,7 +3,8 @@
 Read this before you make a set of ad creatives: static images, storyboard
 videos, raw clips, or a script the advertiser films. SKILL.md ("Images and
 static ad creative", "Video") has the tool flow; this file covers what goes
-into a creative, how to check it, size it, name it and test it.
+into a creative, how to check it, size it, name it and test it, and how to
+finish a UGC video on the user's machine.
 
 [COPYWRITING.md](./COPYWRITING.md) applies to every word on an image or in a
 script, and the restricted-category rules in SKILL.md apply to what an image
@@ -292,3 +293,45 @@ Two ways to make UGC-style video, and the user picks:
 Never script anyone to pose as a customer, and never write results they
 cannot document. A spokesperson says "we" and "our clients". A testimonial is
 a real customer's own words, used with their permission.
+
+---
+
+## 11. Finish a UGC video on the user's machine
+
+Only with a shell and files (Claude Code, Cowork, Codex); a chat-only host
+cannot edit files, so offer the product's options. Try those first:
+`render_video { run_id, redo_clip: n }` remakes one clip, `caption_preset`
+changes the captions, and a wording change is a new `create_ugc_video` run
+(every clip charged again). Edit locally for the rest: a pause or stray word
+at the start or end, a pause between lines, a shorter cut, or parts of two
+runs joined (same presenter and caption style).
+
+- **The file:** `output_url` (from `poll_video_render` or `list_video_runs`)
+  is the finished mp4, 1080x1920 at 30 fps with the captions burned in;
+  download it into the working folder. The raw clips and word timings are
+  not available, so there is no version without captions: find the pauses
+  with `silencedetect` (below) and by looking at the frames.
+- **The tool:** the video tool already installed, usually `ffmpeg`. Never
+  install software without asking; with none, offer the product's options.
+  Examples, times adjusted to the video:
+
+```bash
+ffmpeg -i ad.mp4 -af silencedetect=noise=-35dB:d=0.3 -f null -   # pauses (raise noise if the background is loud)
+ffmpeg -i ad.mp4 -ss 0.4 -to 14.2 -c:v libx264 -crf 18 -pix_fmt yuv420p -r 30 \
+  -c:a aac -b:a 192k -movflags +faststart ad_trim.mp4             # keep 0.4 s to 14.2 s, frame-accurate
+ffmpeg -i a.mp4 -i b.mp4 -filter_complex "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]" \
+  -map "[v]" -map "[a]" -c:v libx264 -crf 18 -pix_fmt yuv420p -r 30 \
+  -c:a aac -b:a 192k -movflags +faststart ad_joined.mp4           # join two parts of the same size
+```
+
+- **Keep:** 9:16 at 1080x1920. Another size only by scaling the whole frame
+  down and padding (4:5: `-vf "scale=-2:1350,pad=1080:1350:(ow-iw)/2:0"`),
+  never stretched and never cropped into the face. Cut on a pause: a cut
+  mid-phrase cuts a burned-in caption, so trim the ends or cut where one
+  clip jumps to the next. Never splice words into a sentence the presenter
+  did not say; no new claims, testimonials or expert poses.
+- **Then:** `ffprobe` the result (duration, 1080x1920) and tell the user what
+  was cut. Upload it (`start_creative_upload` → PUT → `finish_creative_upload`,
+  an mp4 up to 250 MB) under a new name (section 8, the next `_v{n}`) so the
+  original stays. The upload does not carry the run's AI presenter mark:
+  remind the user to turn on the platform's AI label.

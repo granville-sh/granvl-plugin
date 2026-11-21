@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "granvl",
-  "version": "1.0.1-8d82c727eae4",
+  "version": "1.0.1-4293d28f9d52",
   "description": "Build, deploy, A/B test and optimize landing pages and paid campaigns on granvl — hosting, first-party analytics and privacy-first lead delivery, driven from your AI agent.",
   "author": {
     "name": "Granville Technologies Inc.",

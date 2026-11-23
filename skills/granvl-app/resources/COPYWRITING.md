@@ -24,6 +24,17 @@ Lines you save land as `testing`, tagged agent-written. Only warehouse-backed
 experiment results can promote a line to `winner`; unpromising or retired lines
 become `archived`. Do not mark your own work `winner`.
 
+**Asked to delete, remove or get rid of copy?** There is no delete tool: set
+`status: 'archived'` with `update_copy_line` on each line (every id of a merged
+entry). Archived copy leaves the Copywriting library (the page hides it by
+default; Filters › Archived shows it and restores it), automatic tests stop
+launching it, and ads already running with it are not changed. Tell the user
+it left the library and can be brought back from the Archived filter. A line
+deleted while it is still on a page or ad would be pulled straight back into
+the library, so archiving is also what keeps it gone. `list_copy_lines` still
+returns archived lines unless you filter by status: don't reuse one without
+asking.
+
 ---
 
 ## The opening rule
@@ -142,7 +153,7 @@ was. The rationale is also what a human reads when deciding whether to test it.
 | ------------------- | ----------------------------------------------------------------------- |
 | `list_copy_lines`   | Read the library. Filter by kind, surface, status, angle, ICP, or text. |
 | `create_copy_lines` | Save a batch. Needs kind, surface, body, rationale per line.            |
-| `update_copy_line`  | Edit a line, or set status. Retire rather than delete what has run.     |
+| `update_copy_line`  | Edit a line, or set status. "Delete" copy = `status: 'archived'`.       |
 
 `list_copy_lines` returns `opening_three_lines` for every row, so you can
 judge an ad body the way a reader meets it without re-deriving the split.

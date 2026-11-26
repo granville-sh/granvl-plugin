@@ -87,7 +87,9 @@ Recently added with video (listed only where `setup_video` is; if `setup_video` 
 
 - `create_ugc_presenters`, `create_ugc_video` (2026-11-19)
 
-Changed the same day: `setup_video` takes `kind` / `brief` / `script`, `render_video` takes `redo_clip`, and `list_video_runs` / `poll_video_render` report the `clips` and `captions` statuses. The presenter brief of `create_ugc_presenters` and `setup_video` also takes `country` (an older tool list without it still works: the presenter is American). With an older tool list the setup card still asks Slideshow or UGC. Changed 2026-11-20: the brief also takes `look`, the photo style (`washed` Old phone, `natural` Everyday phone, `clean` New phone); an older tool list without it still works: a new presenter gets `washed`, the look as before. Its `motion` also takes `seated` (in a parked car, at a table); an older tool list offers only `walking` and `standing`. Also changed 2026-11-20: `setup_video` takes `template`, a UGC presenter template's id from the Ad templates page (`ugc-…`), and `picks.style_id` takes the same ids; an older tool list still works through `picks.style_id`.
+Changed the same day: `setup_video` takes `kind` / `brief` / `script`, `render_video` takes `redo_clip`, and `list_video_runs` / `poll_video_render` report the `clips` and `captions` statuses. The presenter brief of `create_ugc_presenters` and `setup_video` also takes `country` (an older tool list without it still works: the presenter is American). With an older tool list the setup card still asks Slideshow or UGC. Changed 2026-11-20: the brief also takes `look`, the photo style (`washed` Old phone, `natural` Everyday phone, `clean` New phone); an older tool list without it still works: a new presenter gets `washed`, the look as before. Its `motion` also takes `seated` (in a parked car, at a table); an older tool list offers only `walking` and `standing`. Also changed 2026-11-20: `setup_video` takes `template`, a UGC presenter template's id from the Ad templates page (`ugc-…`), and `picks.style_id` takes the same ids; an older tool list still works through `picks.style_id`. Changed 2026-11-25 (Meta, listed once an ad account is connected): `create_meta_adset` takes `destination` (`lead_form` builds an instant-form ad set) and the goals `LEAD_GENERATION` / `QUALITY_LEAD`, and `create_meta_ad` takes `lead_form_id` (then `link_url` is left out). If your `create_meta_ad` has no `lead_form_id`, the connector loaded the older list: ask for the refresh once, and build instant-form ads in Ads Manager meanwhile.
+
+Changed 2026-11-25 (arguments and fields, no new tool): `get_variant` / `get_funnel` return `pinnedUrl` (variant pin for ads), `duplicate_funnel` takes `save_as_template` / `template_description` (save a workspace template), `delete_funnel` takes `template_slug` (delete one), and `list_templates` returns `workspaceTemplates`. With an older tool list those arguments may not be offered: if a call that needs one is refused, that is the connector refresh above.
 
 On your first turn, alongside `get_workspace_context`, check these names against the tools you actually have. One missing means your connector loaded granvl's tool list before it shipped: tell the user once, in plain words, that granvl has new tools their connection hasn't loaded and ask them to refresh the granvl connector (claude.ai: Settings → Connectors → granvl → refresh, or remove and re-add it, then start a new chat; ChatGPT: the granvl connector's settings; Claude Code: restart the session). Then carry on with the tools you have: never block the task on it, and don't repeat it in the same conversation. If the request needs the missing tool itself, say this action needs the refresh and offer the dashboard path meanwhile (legal links: Settings → Domains → Manage → About).
 
@@ -241,7 +243,7 @@ Note on **Campaigns** (the granvl grouping hubs that link funnels + ad campaigns
 
 The decision tree below routes each question to its tool. Universal habits:
 
-- **Always relay freshness, per account** on spend answers. `get_spend_summary` returns `accountFreshness[]` (one entry per connected ad account) and `freshnessCaveat`: when it is not null, say it in your own words before quoting totals (name the account and the day its spend stops) and offer Sync now on that platform's Ads page. `state: 'no_recent_spend'` means the account synced recently and simply spent nothing (paused campaigns): say that, never call it broken. `staleHours` is the newest sync of anything, so one fresh account can hide a stale one; don't rely on it alone. `get_ad_data_status` carries the same per-account fields and reads `PARTIALLY_STALE` when some accounts are behind. Rows with `joined: false` mean broken tracking → point at `get_tracking_health`. `mode='recognized'` also recovers UTM-stripped clicks by matching the ad's destination URL to the granvl page it hits.
+- **Always relay freshness, per account** on spend answers. `get_spend_summary` returns `accountFreshness[]` (one entry per connected ad account) and `freshnessCaveat`: when it is not null, say it in your own words before quoting totals (name the account and the day its spend stops) and offer Sync now on that platform's Ads page. `state: 'no_recent_spend'` means the account synced recently and simply spent nothing (paused campaigns): say that, never call it broken. `staleHours` is the newest sync of anything, so one fresh account can hide a stale one; don't rely on it alone. `get_ad_data_status` carries the same per-account fields and reads `PARTIALLY_STALE` when some accounts are behind. With `from_date` / `to_date`, `stale` is judged for that range: an account behind today whose data reaches past `to_date` is complete for it, so only relay `freshnessCaveat` when it is set. Rows with `joined: false` mean broken tracking → point at `get_tracking_health`. `mode='recognized'` also recovers UTM-stripped clicks by matching the ad's destination URL to the granvl page it hits.
 - **Start sessions with `list_optimization_actions` and/or `get_daily_brief`** and lead with what changed: "overnight I paused Variant A and shipped two fresh variants; C is leading at 4.1%". This is how the user _sees_ the product working — don't leave it silent.
 - **Call `get_research_history` before proposing or generating any new variant/experiment.** It returns `wins` (repeat these), `avoid` (never re-test these), and `inconclusive`, with structured `changeType` / `metric` / `lift` capture. Never burn a test on a known loser.
 - **Record what tests teach with `save_learning`** — capture the experiment, not just the verdict: `change_type`, `change_summary`, `metric` + `baseline_value`→`result_value`, `hypothesis`. Log losers and inconclusives too.
@@ -381,6 +383,8 @@ several client workspaces                  switch_workspace        (by id or nam
 
 "Are my ads tracked right?"              → get_tracking_health
 "What's my CPL / CPQL / ROAS?"           → get_spend_summary  (relay freshness!)
+"Spend by day / last month / <dates>?"   → get_spend_summary { from_date, to_date, granularity: 'daily' }
+                                           # UTC days, ≤ 92 per call; say the `range` back
 "What campaigns am I running?"           → get_ad_entities    (Granvl's memory)
 "What's working by age/placement/etc?"   → get_ad_breakdowns  (per-segment, rank by metric)
 "Which lander variant wins ad X?"        → get_ad_to_lander_performance  (ad→variant, Wilson-gated winner)
@@ -510,6 +514,17 @@ several client workspaces                  switch_workspace        (by id or nam
                                            create_variant
                                            set_weights          (rebalance)
 
+"This ad should always land on variant X" → get_variant         (its `pinnedUrl` — the live URL with
+"Message match per ad, no new funnel"                             ?gv_pin=; also on get_funnel variants)
+                                           [use pinnedUrl as the ad's destination URL; the UTM
+                                            template appends after it, the pin survives]
+                                           # A NEW variant pins only after publish_funnel:
+                                           # create_variant (weight 0) → publish_funnel → pinnedUrl.
+                                           # Lands on that variant (weight 0 too) for the whole
+                                           # session. Pinned traffic is NOT randomized: keep the
+                                           # ad's variant at weight 0 (out of the split) or say the
+                                           # A/B numbers for it are skewed (see Optimization heuristics).
+
 "Pause the underperformer"               → get_funnel           (read variant stats)
                                            set_weights          (set the loser's weight=0,
                                                                  redistribute to winners)
@@ -573,6 +588,14 @@ several client workspaces                  switch_workspace        (by id or nam
 
 "Clone [teammate]'s funnel"              → duplicate_funnel     (full pages + variants, DRAFT)
 
+"Save this funnel as a template"         → duplicate_funnel     ({ funnel_id, save_as_template: true, name })
+"Make this our starting point"             [relay copied / notCopied: structure + HTML only, never
+                                            destinations, keys, tracking, domain or data]
+                                           create_funnel_from_template ({ template_slug: "ws-…" } later)
+                                           # Private to this workspace; listed under
+                                           # list_templates → workspaceTemplates. 25 max;
+                                           # delete_funnel { template_slug } frees one.
+
 "What's been changing on this variant?"  → list_variant_versions(variant_id)
 
 "Map my form to LeadProsper"             → list_leadprosper_campaigns (campaign fields + suppliers)
@@ -589,9 +612,14 @@ several client workspaces                  switch_workspace        (by id or nam
                                            # Map every required AC field or AC rejects the lead.
 "Remove this integration"                → delete_form_destination (one by id; two-step: preview → user yes → token)
 
-"Did my webhook / GHL hookup work?"      → send_test_lead       (synthetic lead, union of ALL variants'
-"Send a test lead so I can map fields"                            form fields; GHL's mapper needs one
-                                                                  sample request before it can map)
+"Did my webhook / GHL hookup work?"      → send_test_lead       (per destination: the page's real mapped
+"Send a test lead so I can map fields"                            payload with a fake identity. Webhook /
+"Will leads reach LeadProsper / HubSpot?"                         Zapier / GHL are posted; the rest are dry
+                                                                  runs with problems (missing required fields
+                                                                  per variant). deliver_to:[id] posts a real
+                                                                  test: LeadProsper / Lead Distro in their
+                                                                  test mode; CRMs make a REAL contact, so ask
+                                                                  first and relay cleanup)
 
 "Verify phone numbers / block bot leads" → set_sms_verification  (funnel-level; texted 6-digit code
                                                                   gates the form; 100 free per team,
@@ -622,7 +650,7 @@ several client workspaces                  switch_workspace        (by id or nam
 
 ## Platform templates — instantiate, then ADAPT
 
-Granvl ships a published template gallery (`list_templates`): multi-page funnels with proven structure — e.g. **Card quiz** (`quiz-cards`), **Full-screen quiz** (`quiz-fullscreen`), **Ebook + quiz** (`ebook-quiz`). Each card carries `previewUrl` (a live example) and `previewImageUrl` (a screenshot) — surface those so the **user picks**; never choose a template for them.
+Granvl ships a published template gallery (`list_templates`): multi-page funnels with proven structure — e.g. **Card quiz** (`quiz-cards`), **Full-screen quiz** (`quiz-fullscreen`), **Ebook + quiz** (`ebook-quiz`). Each card carries `previewUrl` (a live example) and `previewImageUrl` (a screenshot) — surface those so the **user picks**; never choose a template for them. `list_templates` also returns `workspaceTemplates`: funnels this workspace saved as its own templates (`ws-…` slugs, `duplicate_funnel { save_as_template: true }`), visible to no one else. Offer those alongside granvl's when the user asks to start from a template; the contract below is the same (a saved template's forms also start on the fallback).
 
 The contract after `create_funnel_from_template`:
 
@@ -774,7 +802,7 @@ After publishing (or before handing over a preview for review):
 2. **Walk every page** via the test link. Confirm each renders, the copy is right, and nothing breaks at mobile width. Quizzes: click through every step, including validation errors (submit empty once).
 3. **Submit a test lead through the test link** with obviously fake data (first name "Test", `test@example.com`). Confirm the submit redirects to the thank-you page and `get_funnel_stats` (range `24h`) shows the visit and the conversion.
 4. **Clean up — mandatory.** When testing is done, call `cleanup_test_data(funnel_id)`. It deletes every test row and heals the stats. Never skip this; never leave test traffic in a funnel you hand over.
-5. **Verify real delivery once** when you wired a NEW destination: a test-drive submit can't prove the CRM field mapping, so finish with one `send_test_lead` (Webhook/GHL/Zapier) or one real submit on the live page (other destinations) and ask the user to confirm + delete it from their CRM.
+5. **Verify real delivery once** when you wired a NEW destination: a test-drive submit can't prove the CRM field mapping, so finish with `send_test_lead(funnel_id)`. It posts to Webhook / GHL / Zapier and dry-runs everything else, returning each destination's exact payload and problems (fix every `error` problem first). For a real end-to-end check on another type, ask the user, then call it again with `deliver_to: ["<destination id>"]` — LeadProsper and Lead Distro go in their official test mode; a CRM gets a real contact — and relay `cleanup` so they confirm + delete it.
 6. **Tell the user what you tested** in one or two lines.
 
 Note: the SMS verification popup is skipped in test mode (no SMS spend on tests) — if the funnel uses 2FA and the user wants it proven, do one real submit with their phone number.
@@ -860,6 +888,7 @@ Read variant stats from `get_funnel_stats` (NOT `get_funnel` — structure-only)
 - **Promote (winner takes all)** when one variant has >500 visitors, conv rate >140% of next-best, AND the gap holds across mobile + desktop separately (no Simpson's-paradox flips). Action: `set_weights` winner 100, others 0.
 - **Flag, don't act:** mobile vs desktop conv gap >2×; top traffic source converting <50% of funnel average; one geo >50% of conversions but <20% of visitors (possible bot inflation). Tell the user, pointing at the funnel detail page.
 - **Archive** a variant only after ≥14 days at weight 0 AND user confirmation. `delete_variant` soft-deletes (archives) — it preserves the audit trail; never suggest anything harder.
+- **Pinned ad traffic biases a test.** A visit through a variant's `pinnedUrl` (`?gv_pin=`) was not assigned by the split. Those views and conversions are tagged (`metadata.pinned`) and the auto-optimizer leaves them out of its winner math, but `get_funnel_stats` / `get_variant_stats` / `get_optimization_suggestions` still count them. Before you pause or promote on a page where ads pin to an in-rotation variant, say its numbers include pinned ad traffic; better, keep pinned variants at weight 0 so the split stays clean.
 
 Narrate every action with the data that drove it ("Paused Variant 5 — CTR dropped 38% over 200 visitors").
 

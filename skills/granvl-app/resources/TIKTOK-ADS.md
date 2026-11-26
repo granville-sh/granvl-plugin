@@ -52,7 +52,7 @@ granvl sends page conversions to TikTok server-side when a domain carries a TikT
 
 ## Reading results
 
-Spend, impressions, clicks and TikTok's own conversions land in the warehouse twice a day: `get_spend_summary`, `get_ad_entities` and `get_ad_to_lander_performance` all take `platform: "TIKTOK"`. What you create shows up in `get_ad_entities` at once (granvl records it as it builds). First-party conversions join through the UTM template; `get_tracking_health` flags ads whose landing URL lost it.
+Spend, impressions, clicks and TikTok's own conversions land in the warehouse twice a day. `get_ad_entities` takes `platform: "TIKTOK"`; `get_ad_to_lander_performance` takes it only together with a TikTok advertiser's `account_id` (on its own, `platform` is not used there). **`get_spend_summary` has no platform argument**: it always covers every connected ad account in the workspace (Meta, Google, TikTok, Microsoft), so its `totals` and `daily.totals` are workspace-wide, never TikTok-only, and a `platform` you pass is ignored. For TikTok spend, add up the `byCampaign` rows whose `platform` is `TIKTOK` (each row carries `platform` and `accountId`; daily campaign rows carry no platform, so match them to those rows by `campaignId`), and relay TikTok's entries in `accountFreshness`. Say which you quote: a workspace total is not TikTok spend. What you create shows up in `get_ad_entities` at once (granvl records it as it builds). First-party conversions join through the UTM template; `get_tracking_health` flags ads whose landing URL lost it.
 
 ## Platform differences to remember
 

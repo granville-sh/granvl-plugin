@@ -1026,7 +1026,7 @@ Read [CREATIVE.md](./CREATIVE.md) section 10 first.
 
 > Two ways: I can make it with a generated presenter (a made-up person, not one of your clients or brokers, talking to camera about how it works; ad platforms ask you to label it as AI), or write a short script and shot list that you or a broker films on a phone (I file and test the takes). Which would you like?
 
-(A generated presenter: write the script with them first, then `setup_video { kind: 'ugc', script, brief }` with a presenter you write from what they tell you (ask who it should be first); the card shows two photos, they approve one and the video follows (SKILL.md). For a mortgage brokerage it still never speaks as a client or an adviser, and the script keeps to the category rules below.)
+(A generated presenter: write the script with them first, then `setup_video { kind: 'ugc', script, brief }` with a presenter you write from what they tell you (ask who it should be first); the card shows the photos (usually three), they approve one and the same card follows the video, so make no other video call for the run until they ask for something (one card per run; SKILL.md). For a mortgage brokerage it still never speaks as a client or an adviser, and the script keeps to the category rules below.)
 
 > **User:** "The script. Our brokers will film it."
 

@@ -253,8 +253,10 @@ Two ways to make UGC-style video, and the user picks:
 - **A generated presenter** (`setup_video { kind: 'ugc', script, brief }`,
   SKILL.md): a made-up person talks to camera in a phone-selfie video with
   captions. Quick, no filming. The script comes first (write it with the
-  user if they have none, about 30 seconds); the call makes two photos of a
-  presenter you describe, the user approves one, and the video follows. The person is always generated, never a real or famous
+  user if they have none, about 30 seconds); the call makes photos (usually
+  three) of a presenter you describe, the user approves one on the card, and
+  the same card follows the video (one card per run: no other video call for
+  it until the user asks). The person is always generated, never a real or famous
   one and never a lookalike, with no photo of a person and no voice sample
   anywhere. The presenter talks to the viewer about the offer; it never
   speaks as a customer ("I saved $400"), as an expert ("as a doctor") or as a
